@@ -44,10 +44,14 @@
 /* How long one 1541 track can take, in video frames of about 17 ms.
  * Measured under VICE with a 1541 formatting back to back tracks: about
  * 190 frames per track with the motor already running, and about 210 more
- * if it has to spin up first. This is roughly twice that, because
- * overrunning it means talking to a deaf drive.
+ * if it has to spin up first. The default is roughly twice that, because
+ * overrunning it means talking to a deaf drive, and that hangs the
+ * machine rather than failing. Adjustable from the interface so it can be
+ * brought down to suit a drive that is quicker than the emulator.
  */
 #define A41_TRACK_WAIT 420u
+
+unsigned int fmt_track_wait = A41_TRACK_WAIT;
 
 /* --- 1581 zero page and work area ------------------------------------- */
 #define A81_ENDCYL  0x008fu /* FORMATDK stops when current == this   */
@@ -110,7 +114,7 @@ unsigned char fmt_begin(unsigned char id1, unsigned char id2)
         dos_poke(A41_FTNUM, 0xff);
         dos_poke(DC1541_ENDTRK, 1);
         dos_job_start(A41_SLOT, JOB_EXEC, 1, 0);
-        dos_delay(A41_TRACK_WAIT);
+        dos_delay_long(fmt_track_wait);
         dos_job_status(A41_SLOT);
         return 1;
     }
@@ -149,7 +153,7 @@ unsigned char fmt_track(unsigned char track)
         dos_poke(A41_RETRY, 1);
         dos_poke(A41_FTNUM, track);
         dos_job_start(A41_SLOT, JOB_EXEC, track, 0);
-        dos_delay(A41_TRACK_WAIT);
+        dos_delay_long(fmt_track_wait);
         return dos_job_status(A41_SLOT);
     }
 
@@ -224,7 +228,7 @@ unsigned char fmt_filesystem(const char *name,
             cmd[i++] = c;
         }
         dos_cmd_raw(cmd, i);
-        dos_delay(A41_TRACK_WAIT);
+        dos_delay_long(fmt_track_wait);
         return dos_status();
     }
 
@@ -254,9 +258,85 @@ unsigned char fmt_filesystem(const char *name,
     return dos_status();
 }
 
+/* Mark every sector of a bad track as allocated, so the disk is still
+ * usable and nothing is ever written where the surface failed. Done after
+ * the directory exists, when the block commands work again.
+ *
+ * 1541: one BAM at 18/0, four bytes per track from offset 4.
+ * 1581: two BAMs, 40/1 for tracks 1 to 40 and 40/2 for 41 to 80, six bytes
+ *       per track from offset 16.
+ */
 unsigned char fmt_lock_out(const unsigned char *tracks, unsigned char count)
 {
-    (void)tracks;
-    (void)count;
-    return 0;
+    unsigned char i, t, st;
+    unsigned char bam_sector;
+    unsigned char last = 0;
+    unsigned char dirty = 0;
+
+    if (count == 0) {
+        return 0;
+    }
+
+    if (dos_drive_type == DRV_1541) {
+        st = dos_read_sector(dos_dir_track, 0, sec);
+        if (st != 0) {
+            return st;
+        }
+        for (i = 0; i < count; ++i) {
+            t = tracks[i];
+            if (t >= 1 && t <= 35) {
+                unsigned char o = (unsigned char)(4 + (t - 1) * 4);
+                sec[o]     = 0; /* no blocks free on this track */
+                sec[o + 1] = 0;
+                sec[o + 2] = 0;
+                sec[o + 3] = 0;
+            }
+        }
+        return dos_write_sector(dos_dir_track, 0, sec);
+    }
+
+    if (dos_drive_type == DRV_1581) {
+        /* Walk the two BAM sectors in turn rather than re-reading one per
+         * bad track. The list arrives in track order.
+         */
+        for (bam_sector = 1; bam_sector <= 2; ++bam_sector) {
+            unsigned char lo = (unsigned char)(bam_sector == 1 ? 1 : 41);
+            unsigned char hi = (unsigned char)(bam_sector == 1 ? 40 : 80);
+
+            dirty = 0;
+            for (i = 0; i < count; ++i) {
+                if (tracks[i] >= lo && tracks[i] <= hi) {
+                    dirty = 1;
+                    break;
+                }
+            }
+            if (!dirty) {
+                continue;
+            }
+
+            st = dos_read_sector(dos_dir_track, bam_sector, sec);
+            if (st != 0) {
+                return st;
+            }
+            for (i = 0; i < count; ++i) {
+                t = tracks[i];
+                if (t >= lo && t <= hi) {
+                    unsigned char o =
+                        (unsigned char)(16 + (t - lo) * 6);
+                    unsigned char k;
+                    for (k = 0; k < 6; ++k) {
+                        sec[o + k] = 0;
+                    }
+                }
+            }
+            st = dos_write_sector(dos_dir_track, bam_sector, sec);
+            if (st != 0) {
+                return st;
+            }
+        }
+        (void)last;
+        return 0;
+    }
+
+    return DOS_ERR_TIMEOUT;
 }

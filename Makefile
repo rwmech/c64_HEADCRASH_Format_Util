@@ -10,11 +10,14 @@
 
 CC65    := cl65
 TARGET  := c64
-CFLAGS  := -t $(TARGET) -O -I src
+
+# The VIC is put in bank 1 so the bitmap at $4000 and the screen matrix at
+# $6000 are plain RAM with the ROMs still mapped in, which means no banking
+# while drawing. The C stack has to come down below all of that.
+CFLAGS  := -t $(TARGET) -O -I src -Wl -D__HIMEM__=0x3f00
 
 BUILD   := build
 SRC     := src/main.c src/ui.c src/dos.c src/fmt.c
-ASM     := src/gfx.s
 GEN     := src/drivecode_1541.h
 
 PRG     := $(BUILD)/headcrash.prg
@@ -31,11 +34,17 @@ $(GEN): src/drivecode_1541.s tools/drivecode.cfg tools/build_drivecode.py
 	@mkdir -p $(BUILD)
 	python3 tools/build_drivecode.py
 
-$(PRG): $(SRC) $(ASM) $(GEN) src/dos.h src/fmt.h src/ui.h
+$(PRG): $(SRC) $(GEN) src/dos.h src/fmt.h src/ui.h
 	@mkdir -p $(BUILD)
-	$(CC65) $(CFLAGS) -o $@ $(SRC) $(ASM)
+	$(CC65) $(CFLAGS) -o $@ $(SRC)
 
-tests: $(GEN)
+# Same program, but it starts formatting without being asked, so a run can
+# be driven from the command line under an emulator.
+$(BUILD)/hc_auto.prg: $(SRC) $(GEN)
+	@mkdir -p $(BUILD)
+	$(CC65) $(CFLAGS) -DAUTORUN -o $@ $(SRC)
+
+tests: $(GEN) $(BUILD)/hc_auto.prg
 	@mkdir -p $(BUILD)
 	$(foreach h,$(HARNESS),$(CC65) $(CFLAGS) -o $(BUILD)/$(h).prg \
 		tests/$(h).c src/dos.c src/fmt.c &&) true

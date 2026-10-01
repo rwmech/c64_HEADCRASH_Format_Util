@@ -58,7 +58,25 @@ disassembling the ROM images themselves.
   bytes changed.
 - A full pass: 35 of 35 tracks on a 1541, 80 of 80 on a 1581, no errors.
 - A formatted 1541 disk that `c1541` reads back as a valid empty disk with
-  the right name, ID and 664 blocks free.
+  the right name, ID and 664 blocks free, and the same for a 1581 with 3160
+  blocks free.
+- The whole thing driven from its own interface, start to finish, on both
+  drives.
+
+## The screen
+
+The VIC sits in bank 1, with the bitmap at `$4000` and the screen matrix at
+`$6000`, so everything it reads is plain RAM with the ROMs still mapped in
+and drawing never has to bank anything out. The C stack comes down to
+`$3f00` to stay clear of it.
+
+One ink per 8x8 cell is the rule the layout is built around: the panels, the
+disc and the bar keep to their own cells, which is why there are no two
+coloured things touching anywhere on the screen.
+
+The disc fills in from the outside as tracks are laid down, one ring per
+track where the radius allows and shared rings where it does not. The track
+counter is the exact figure; the disc is the shape of the progress.
 
 ## What an emulator cannot tell you
 
@@ -74,18 +92,22 @@ KERNAL's serial send has no timeout once a device has acknowledged, and a
 1541 writing a track acknowledges in hardware while its CPU is busy
 elsewhere. There is no signal to wait for and nothing safe to poll.
 
-The util therefore has a measure mode, which times real tracks on your own
-drives and prints the numbers, so that constant can be set from hardware
-rather than from an emulator.
+There is no safe way to measure it automatically, because every way of
+asking the drive whether it has finished is the thing that hangs. So the
+wait is adjustable from the interface instead, with F3, and shown in tenths
+of a second next to the device number. Lower is quicker; if a format ever
+freezes the machine part way through, that number was too low for your
+drive. The 1581 does not use it and does not show it.
 
 ## Layout
 
 ```
-src/dos.c          IEC and CBM DOS: commands, M-R/M-W, job queue, sectors
-src/fmt.c          the track at a time format engine
-src/drivecode_1541.s   the 26 byte gate that runs in the drive
-src/ui.c           hi-res bitmap interface
-tools/             drivecode assembly, image helpers used by the tests
-tests/             harnesses, each one a standalone .prg
-docs/DESIGN.md     why the awkward parts are the way they are
+src/main.c             screen layout, keys, the format run
+src/ui.c               hi-res bitmap interface
+src/dos.c              IEC and CBM DOS: commands, M-R/M-W, job queue, sectors
+src/fmt.c              the track at a time format engine
+src/drivecode_1541.s   the 26 byte gate that runs inside the drive
+tools/                 drivecode assembly, image helpers used by the tests
+tests/                 harnesses, each one a standalone .prg
+docs/DESIGN.md         why the awkward parts are the way they are
 ```

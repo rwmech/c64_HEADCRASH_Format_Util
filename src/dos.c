@@ -59,6 +59,16 @@ void dos_delay(unsigned char frames)
     }
 }
 
+void dos_delay_long(unsigned int frames)
+{
+    while (frames--) {
+        while (*(volatile unsigned char *)0xd012 != 0) {
+        }
+        while (*(volatile unsigned char *)0xd012 == 0) {
+        }
+    }
+}
+
 /* ---------------------------------------------------------------------- */
 /* channel handling                                                        */
 /* ---------------------------------------------------------------------- */
@@ -346,6 +356,57 @@ unsigned char dos_write_sector(unsigned char track, unsigned char sector,
     cbm_k_close(BUF_LFN);
     buf_is_open = 0;
     return i;
+}
+
+/* Read one 256 byte sector through the buffer channel. */
+unsigned char dos_read_sector(unsigned char track, unsigned char sector,
+                              unsigned char *buf)
+{
+    unsigned char cmd[20];
+    unsigned char i;
+    unsigned int  n;
+
+    cbm_k_setlfs(BUF_LFN, dos_dev, BUF_LFN);
+    cbm_k_setnam("#");
+    if (cbm_k_open() != 0) {
+        return DOS_ERR_TIMEOUT;
+    }
+    buf_is_open = 1;
+
+    /* U1: disk to buffer. */
+    i = 0;
+    cmd[i++] = 0x55; /* 'U' */
+    cmd[i++] = 0x31; /* '1' */
+    cmd[i++] = 0x3a; /* ':' */
+    i += put_num(cmd + i, BUF_LFN);
+    cmd[i++] = 0x20;
+    i += put_num(cmd + i, 0);
+    cmd[i++] = 0x20;
+    i += put_num(cmd + i, track);
+    cmd[i++] = 0x20;
+    i += put_num(cmd + i, sector);
+    dos_cmd_raw(cmd, i);
+
+    i = dos_status();
+    if (i != 0) {
+        cbm_k_close(BUF_LFN);
+        buf_is_open = 0;
+        return i;
+    }
+
+    if (cbm_k_chkin(BUF_LFN) != 0) {
+        cbm_k_clrch();
+        cbm_k_close(BUF_LFN);
+        buf_is_open = 0;
+        return DOS_ERR_TIMEOUT;
+    }
+    for (n = 0; n < 256u; ++n) {
+        buf[n] = cbm_k_basin();
+    }
+    cbm_k_clrch();
+    cbm_k_close(BUF_LFN);
+    buf_is_open = 0;
+    return 0;
 }
 
 /* Write one sector using the job queue instead of the block commands.

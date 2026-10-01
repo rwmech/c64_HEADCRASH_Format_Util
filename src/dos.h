@@ -40,6 +40,7 @@ extern unsigned char dos_dir_track;/* 18 or 40 */
 
 /* Wait n video frames (about 17 ms each on NTSC). */
 void dos_delay(unsigned char frames);
+void dos_delay_long(unsigned int frames);
 
 /* --- channel handling ------------------------------------------------- */
 
@@ -73,6 +74,12 @@ void          dos_mw(unsigned int addr, const unsigned char *buf,
 void          dos_poke(unsigned int addr, unsigned char val);
 
 /* --- sectors ---------------------------------------------------------- */
+
+/* Read one 256 byte sector using the block commands. Returns the DOS
+ * error code, 0 == OK.
+ */
+unsigned char dos_read_sector(unsigned char track, unsigned char sector,
+                              unsigned char *buf);
 
 /* Write one 256 byte sector using the block commands. Returns the DOS
  * error code, 0 == OK.

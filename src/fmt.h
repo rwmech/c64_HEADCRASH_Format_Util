@@ -21,6 +21,14 @@ unsigned char fmt_begin(unsigned char id1, unsigned char id2);
  */
 unsigned char fmt_track(unsigned char track);
 
+/* How long the host waits for a 1541 track before it speaks to the drive
+ * again, in video frames. There is nothing to poll while a 1541 formats
+ * (see docs/DESIGN.md), so this is a measured worst case rather than a
+ * signal, and it is the one number in the program that an emulator cannot
+ * settle. Too high only wastes time; too low hangs the machine.
+ */
+extern unsigned int fmt_track_wait;
+
 /* Start a track and return immediately, for diagnostics. */
 void          fmt_track_start(unsigned char track);
 
