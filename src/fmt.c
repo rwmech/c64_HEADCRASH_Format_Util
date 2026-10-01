@@ -1,0 +1,262 @@
+/* fmt.c - low level, track at a time formatting engine.
+ *
+ * Both drives can already format; neither will tell you how far it has got,
+ * because the DOS sits in a wait loop for the whole job. So we take the
+ * drive's own formatter and run it one track per job, which puts the loop
+ * on this side of the cable where it can be drawn and retried.
+ *
+ *   1541  no per track format job exists, so a small gate is uploaded in
+ *         front of the ROM formatter's re-entry point. See
+ *         src/drivecode_1541.s.
+ *   1581  FORMATDK (job $F0) already walks cylinders and stops when the
+ *         current cylinder reaches the end marker at $8F, so pointing start
+ *         and end at the same cylinder is all it takes.
+ *
+ * The two drives also differ in how a finished job is noticed, and the
+ * difference is forced by the hardware rather than chosen:
+ *
+ *   1581  stays responsive while it formats, so the job slot is simply
+ *         polled until the controller clears the busy bit.
+ *   1541  writes a whole track inside one pass of its controller
+ *         interrupt and answers nothing on the serial bus for the duration.
+ *         Its ATN acknowledge is done in hardware, so from the C64 it still
+ *         looks present and willing, and anything sent to it runs into the
+ *         KERNAL's wait at $ED5A, which has no timeout: the machine hangs
+ *         outright. There is no signal to wait for, so the host waits out a
+ *         measured worst case instead and only then asks. See docs/DESIGN.md.
+ *
+ * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ *
+ * Required libraries: cc65 C library.
+ */
+
+#include <string.h>
+#include "dos.h"
+#include "fmt.h"
+#include "drivecode_1541.h"
+
+/* --- 1541 ROM and zero page addresses --------------------------------- */
+#define A41_FTNUM   0x0051u /* track the ROM formatter is working on */
+#define A41_MASTID  0x0012u /* master disk ID, drive 0 (ID1, ID2)    */
+#define A41_RETRY   0x0620u /* formatter's own retry counter         */
+#define A41_SLOT    3u      /* buffer 3, as the ROM's own N: uses    */
+
+/* How long one 1541 track can take, in video frames of about 17 ms.
+ * Measured under VICE with a 1541 formatting back to back tracks: about
+ * 190 frames per track with the motor already running, and about 210 more
+ * if it has to spin up first. This is roughly twice that, because
+ * overrunning it means talking to a deaf drive.
+ */
+#define A41_TRACK_WAIT 420u
+
+/* --- 1581 zero page and work area ------------------------------------- */
+#define A81_ENDCYL  0x008fu /* FORMATDK stops when current == this   */
+#define A81_CURTRK  0x01bcu /* controller's current cylinder, buf 0  */
+#define A81_SLOT    0u      /* buffer 0, as the ROM's own N: uses    */
+
+/* Geometry the 1581 formatter expects, mirroring what the ROM's N: command
+ * sets up at $BD7C before it issues FORMATDK. Values read out of
+ * dos1581-318045-02.bin, not from memory.
+ */
+#define A81_NSECT   0x0075u /* 40 logical sectors per track          */
+#define A81_DENS    0x0091u /* density index 2                       */
+#define A81_SEC0    0x0092u /* first physical sector    (10)         */
+#define A81_SECN    0x0093u /* last physical sector     (10)         */
+#define A81_SIDES   0x0094u /* sides per cylinder       (1 -> 2)     */
+#define A81_FILL    0x009bu /* format filler byte       ($e5)        */
+#define A81_GAP     0x009au /* format gap length        ($26)        */
+#define A81_SECNV   0x01f0u /* shadow of $93                         */
+#define A81_SIDESV  0x01efu /* shadow of $94                         */
+
+#define JOB_RECAL   0xc0u   /* 1581: recalibrate, issued before $f0  */
+
+/* How long the 1581's own N: takes, in frames. A whole disk, both sides,
+ * measured at about 45 s under VICE; this is comfortably past it.
+ */
+#define A81_FORMAT_WAIT 4200u
+
+/* One sector's worth of scratch, static because cc65 keeps locals on a
+ * software stack that this would not fit on.
+ */
+static unsigned char sec[256];
+
+unsigned char fmt_seed_status;
+unsigned char fmt_init_status;
+
+/* ---------------------------------------------------------------------- */
+
+unsigned char fmt_begin(unsigned char id1, unsigned char id2)
+{
+    unsigned char ids[2];
+
+    if (dos_drive_type == DRV_1541) {
+        /* Every 1541 sector header carries the disk ID, and the formatter
+         * takes it from the master ID at $12/$13 (ROM $FC53).
+         */
+        ids[0] = id1;
+        ids[1] = id2;
+        dos_mw(A41_MASTID, ids, 2);
+
+        /* Up to 32 bytes per M-W, so the gate goes up in two pieces. */
+        dos_mw(DC1541_ADDR, dc1541, 16);
+        dos_mw(DC1541_ADDR + 16, dc1541 + 16, DC1541_SIZE - 16);
+
+        /* Run the gate once with FTNUM = $ff and the end track at 1. The
+         * ROM's init pass runs (head to track 1, timings, bit rate) and
+         * then the gate ends the job before any track is written, so from
+         * here on every track takes the same path, and the motor is
+         * already up to speed when the first one starts.
+         */
+        dos_poke(A41_FTNUM, 0xff);
+        dos_poke(DC1541_ENDTRK, 1);
+        dos_job_start(A41_SLOT, JOB_EXEC, 1, 0);
+        dos_delay(A41_TRACK_WAIT);
+        dos_job_status(A41_SLOT);
+        return 1;
+    }
+
+    if (dos_drive_type == DRV_1581) {
+        /* The 1581 writes MFM headers that hold no disk ID, so id1/id2 only
+         * matter later, in the directory header sector.
+         */
+        dos_poke(A81_NSECT,  0x28);
+        dos_poke(A81_DENS,   0x02);
+        dos_poke(A81_SEC0,   0x0a);
+        dos_poke(A81_SECN,   0x0a);
+        dos_poke(A81_SECNV,  0x0a);
+        dos_poke(A81_SIDES,  0x01);
+        dos_poke(A81_SIDESV, 0x01);
+        dos_poke(A81_FILL,   0xe5);
+        dos_poke(A81_GAP,    0x26);
+
+        /* Recalibrate so the controller's idea of where the head is agrees
+         * with ours before we start pinning cylinders.
+         */
+        dos_job(A81_SLOT, JOB_RECAL, 1, 0);
+        return 1;
+    }
+
+    return 0; /* nothing we know how to drive at this level */
+}
+
+unsigned char fmt_track(unsigned char track)
+{
+    if (dos_drive_type == DRV_1541) {
+        dos_poke(DC1541_ENDTRK, (unsigned char)(track + 1));
+        /* One attempt per job: the UI owns the retry loop, so the ROM's
+         * own retry counter is pinned at 1 and errors come straight back.
+         */
+        dos_poke(A41_RETRY, 1);
+        dos_poke(A41_FTNUM, track);
+        dos_job_start(A41_SLOT, JOB_EXEC, track, 0);
+        dos_delay(A41_TRACK_WAIT);
+        return dos_job_status(A41_SLOT);
+    }
+
+    if (dos_drive_type == DRV_1581) {
+        /* Logical track 1..80 is physical cylinder 0..79, both sides. The
+         * controller does that conversion itself when it takes the track
+         * out of the job header, but FORMATDK's end marker at $8f is
+         * compared against the cylinder, so the two are set in different
+         * units on purpose. Checked on a $55 filled image: header 5 with
+         * $8f = 4 rewrites logical track 5 and nothing else.
+         */
+        unsigned char cyl = (unsigned char)(track - 1);
+        dos_poke(A81_CURTRK, cyl);
+        dos_poke(A81_ENDCYL, cyl);
+        return dos_job(A81_SLOT, JOB_FORMAT, track, 0);
+    }
+
+    return DOS_ERR_TIMEOUT;
+}
+
+void fmt_end(void)
+{
+    if (dos_drive_type == DRV_1541) {
+        /* Leave FTNUM the way the ROM leaves it after a normal format. */
+        dos_poke(A41_FTNUM, 0xff);
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+/* filesystem                                                              */
+/* ---------------------------------------------------------------------- */
+
+/* N: with an ID formats the disk; N: without one only rebuilds the BAM and
+ * directory on a disk that is already formatted, which is exactly the half
+ * we still need once the track pass has finished. It is also the half worth
+ * leaving to the DOS, which knows its own BAM layout.
+ */
+unsigned char fmt_filesystem(const char *name,
+                             unsigned char id1, unsigned char id2)
+{
+    unsigned char cmd[24];
+    unsigned char i = 0;
+    unsigned char c;
+
+    if (dos_drive_type == DRV_1541) {
+        /* A freshly laid down track has $01 in every byte, so the
+         * directory header sector carries no DOS version marker and the
+         * DOS refuses the disk: N: without an ID answers 73, and so does
+         * every block command, which is what would otherwise write the
+         * byte. The job queue goes round the outside of all that, and once
+         * the header sector reads as a 1541 disk again the DOS is happy to
+         * build the real BAM and directory on top of it.
+         */
+        unsigned int t;
+
+        for (t = 0; t < 256u; ++t) {
+            sec[t] = 0;
+        }
+        sec[0] = 18;   /* directory starts at 18/1 */
+        sec[1] = 1;
+        sec[2] = 0x41; /* 'A', CBM DOS V2.6 */
+        fmt_seed_status = dos_write_sector_job(dos_dir_track, 0, sec);
+
+        /* Make the drive look at the disk it is actually holding. */
+        dos_cmd("I0");
+        fmt_init_status = dos_status();
+
+        cmd[i++] = 0x4e; /* 'N' */
+        cmd[i++] = 0x30; /* '0' */
+        cmd[i++] = 0x3a; /* ':' */
+        while ((c = (unsigned char)*name++) != 0 && i < 19) {
+            cmd[i++] = c;
+        }
+        dos_cmd_raw(cmd, i);
+        dos_delay(A41_TRACK_WAIT);
+        return dos_status();
+    }
+
+    /* The 1581 has no way in: its block commands are refused for the same
+     * reason, and its job queue stages writes through a 512 byte physical
+     * sector that is re-read from the disk before every write, so a seed
+     * cannot be planted there either. What is left is the drive's own
+     * N: with an ID, which lays down a correct disk from nothing. It
+     * formats the surface a second time to do it, which is the price of
+     * the track by track pass that came before.
+     */
+    cmd[i++] = 0x4e; /* 'N' */
+    cmd[i++] = 0x30; /* '0' */
+    cmd[i++] = 0x3a; /* ':' */
+    while ((c = (unsigned char)*name++) != 0 && i < 17) {
+        cmd[i++] = c;
+    }
+    cmd[i++] = 0x2c; /* ',' */
+    cmd[i++] = id1;
+    cmd[i++] = id2;
+    dos_cmd_raw(cmd, i);
+
+    /* No way to watch this one: the DOS sits in its own wait loop for the
+     * whole format and answers nothing meaningful until it is done.
+     */
+    dos_delay(A81_FORMAT_WAIT);
+    return dos_status();
+}
+
+unsigned char fmt_lock_out(const unsigned char *tracks, unsigned char count)
+{
+    (void)tracks;
+    (void)count;
+    return 0;
+}
