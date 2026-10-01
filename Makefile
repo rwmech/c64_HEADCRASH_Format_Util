@@ -24,7 +24,7 @@ PRG     := $(BUILD)/headcrash.prg
 
 HARNESS := t_probe t_fmt t_full t_sect
 
-.PHONY: all tests clean
+.PHONY: all tests dist clean
 
 all: $(PRG)
 
@@ -48,6 +48,17 @@ tests: $(GEN) $(BUILD)/hc_auto.prg
 	@mkdir -p $(BUILD)
 	$(foreach h,$(HARNESS),$(CC65) $(CFLAGS) -o $(BUILD)/$(h).prg \
 		tests/$(h).c src/dos.c src/fmt.c &&) true
+
+# The binaries that ship in dist/, so the repository carries something that
+# runs without a toolchain. c1541 comes with VICE.
+dist: $(PRG)
+	@mkdir -p dist
+	cp $(PRG) dist/headcrash.prg
+	rm -f dist/headcrash.d64 dist/headcrash.d81
+	c1541 -format "headcrash,hc" d64 dist/headcrash.d64 \
+		-write $(PRG) "headcrash"
+	c1541 -format "headcrash,hc" d81 dist/headcrash.d81 \
+		-write $(PRG) "headcrash"
 
 clean:
 	rm -rf $(BUILD)

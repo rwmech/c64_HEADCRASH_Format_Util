@@ -28,6 +28,20 @@ The two drives need different handling:
   `$0600` in drive RAM, in front of the point where the controller re-enters
   the ROM formatter. See `src/drivecode_1541.s`, which explains itself.
 
+## Just run it
+
+`dist/` holds a built `headcrash.prg` and the same program on a `.d64` and a
+`.d81`, so nothing has to be compiled to try it. Releases carry the same
+three files.
+
+```
+LOAD"HEADCRASH",8,1
+RUN
+```
+
+F1 picks the device, F3 sets the 1541 track wait, F5 names the disk, F7
+formats, RUN/STOP stops a run in progress.
+
 ## Build
 
 Needs cc65 (tested with 2.19) and Python 3.
