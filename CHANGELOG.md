@@ -47,6 +47,23 @@ VICE 3.10 with the original drive ROMs.
   ninety seconds it says the drive never answered rather than sitting
   there.
 
+- **The colour bug, the garbage on the disc, and the track window never
+  appearing were all one fault.** `gfx_clear` flooded four whole pages of
+  the screen matrix, and the last eight bytes of the fourth page are the
+  sprite pointers, so every clear repointed all eight sprites at whatever
+  data block the ink byte happened to spell. That block lands inside the
+  program's own string table, which is why the disc had shapes on it that
+  looked like letters: they were letters. The clear writes a thousand
+  bytes now, and the pointers are held in a table and written again every
+  time a sprite is placed, so nothing can leave a sprite showing somebody
+  else's bytes.
+- **The head sprite** is a slider pad on a tapered arm now, in two sizes,
+  rather than the block nobody had actually seen yet.
+- **Moire across the disc.** Eighty tracks over thirty one pixels of
+  radius put a ring on every one, and with the horizontal radius stretched
+  by a fifth they landed a fifth of a pixel apart and interfered. Rings
+  snap to every second radius, which leaves a clear gap between each one.
+
 ### Added
 
 - **Sound.** The stepper tick, a 24 ms noise burst per track, and six

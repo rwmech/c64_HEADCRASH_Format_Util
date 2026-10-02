@@ -285,8 +285,16 @@ clr_page:
         sta ptr
         lda #>SCREEN
         sta ptr+1
+        ; Exactly a thousand bytes, which is the matrix. The last eight
+        ; bytes of the page after it are the sprite pointers, and flooding
+        ; four whole pages wrote the ink byte straight over them: every
+        ; clear left all eight sprites pointing at whatever block the
+        ; colour happened to spell, which lands in the program's own string
+        ; data. That is why the track window never appeared and why there
+        ; was garbage on the disc that looked like letters. It was
+        ; letters.
         lda _gfx_col
-        ldx #$04
+        ldx #$03
         ldy #$00
 clr_scr:
         sta (ptr),y
@@ -295,6 +303,12 @@ clr_scr:
         inc ptr+1
         dex
         bne clr_scr
+        ldy #$00
+clr_tail:
+        sta (ptr),y
+        iny
+        cpy #$e8                ; 768 + 232 = 1000, and stop
+        bne clr_tail
         rts
 
 ; ----------------------------------------------------------------------

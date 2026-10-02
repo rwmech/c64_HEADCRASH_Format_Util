@@ -359,7 +359,8 @@ static void draw_slot(void)
  * pixels tall and a sprite is 21. Sprite column 5 is the left edge of the
  * window, so the sprites go five pixels left of it.
  */
-#define WIN_SX  (SLOT_X - 5)
+#define WIN_SX  (SLOT_X - 5)     /* sprite column 6 lands inside the frame */
+#define HEAD_SX SLOT_X           /* the pad sits centred in the window */
 #define WIN_SY1 SLOT_Y1
 #define WIN_SY2 ((unsigned char)(SLOT_Y1 + 21))
 
@@ -706,10 +707,22 @@ static void show_bar(unsigned char done, unsigned char total)
  */
 static unsigned char ring_radius(unsigned char track, unsigned char total)
 {
-    unsigned int span = DISC_RY - DISC_RMIN - 3;
+    unsigned int  span = DISC_RY - DISC_RMIN - 3;
+    unsigned char r    = (unsigned char)(DISC_RY - 1 -
+                                         (span * (unsigned int)(track - 1))
+                                         / total);
 
-    return (unsigned char)(DISC_RY - 1 -
-                           (span * (unsigned int)(track - 1)) / total);
+    /* Snapped to every second radius, which is what takes the moire off
+     * the disc. Eighty tracks over thirty one pixels of radius puts a ring
+     * on every single one, and because the horizontal radius is stretched
+     * by a fifth those rings land a fifth of a pixel apart in x: they
+     * overlap, then clear, then overlap, and the interference shows up as
+     * banding across the whole disc, worse on a television than on an
+     * emulator. Two pixels apart leaves a clear gap between every ring and
+     * the pattern goes away. The disc reads as a record rather than as a
+     * grey wash, and half as many rings is half the drawing.
+     */
+    return (unsigned char)(r & 0xfe);
 }
 
 static void show_ring(unsigned char track, unsigned char total,
@@ -743,7 +756,7 @@ static void show_ring(unsigned char track, unsigned char total,
         } else if (hy < SLOT_Y1) {
             hy = SLOT_Y1;
         }
-        ui_sprite(0, WIN_SX, (unsigned char)(hy - 10));
+        ui_sprite(0, HEAD_SX, (unsigned char)(hy - 10));
     }
     (void)rx;
 }
