@@ -16,7 +16,7 @@
 #include "dos.h"
 #include "fmt.h"
 
-#define VERSION "V1.4"
+#define VERSION "V1.5"
 
 /* How many times a track is attempted before it is called bad. Each
  * attempt is a whole job, drawn as it happens.
@@ -524,6 +524,17 @@ static void irq_resume(void)
     }
 }
 
+/* The splash is compiled in only when there is room for it.
+ *
+ * It costs about a kilobyte and the program ends about two hundred bytes
+ * below its ceiling, which is fixed at $5B00 by the sprites the VIC has to
+ * read out of bank 1. Putting it in a second code region that runs from
+ * the free RAM at $C9D1 does not help: the segment still has to be stored
+ * in the file below the ceiling, so it costs the same space either way.
+ * Build with -DSPLASH once something else has been cut.
+ */
+#ifdef SPLASH
+
 /* The splash: the card, laid out the way the card is.
  *
  * Not the artwork converted. A full screen picture is eight thousand bytes
@@ -642,6 +653,8 @@ static void splash(void)
         dos_delay_long(1);
     }
 }
+
+#endif /* SPLASH */
 
 static void draw_static(void)
 {
@@ -1350,9 +1363,15 @@ int main(void)
 {
     unsigned char c;
 
+    /* CODE2 is stored in the file with everything else and runs at
+     * $C9D1, so it has to be put there before it is called. memcpy of a
+     * few hundred bytes, once.
+     */
     ui_init();
     snd_init();
+#ifdef SPLASH
     splash();
+#endif
     draw_static();
     irq_resume();
     show_track_labels();

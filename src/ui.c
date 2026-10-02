@@ -593,6 +593,8 @@ void ui_char(unsigned int x, unsigned char y, char c)
     draw_glyph(x, y, glyph_of((unsigned char)c));
 }
 
+#ifdef SPLASH
+
 /* Text at two or three times size, by reading the glyph out of the
  * character set and drawing every set bit as a square block.
  *
@@ -624,6 +626,8 @@ void ui_text_big(unsigned int x, unsigned char y, const char *s,
         x += (unsigned int)scale * 8u;
     }
 }
+
+#endif /* SPLASH */
 
 void ui_text(unsigned int x, unsigned char y, const char *s)
 {

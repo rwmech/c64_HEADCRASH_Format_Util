@@ -639,12 +639,33 @@ unsigned char dos_job_status(unsigned char slot)
     unsigned char st;
     unsigned int  guard;
 
+    /* Spaced out, and not many of them.
+     *
+     * This loop only goes round when the job code still has bit 7 set,
+     * which means the job has not finished, which on a 1541 means the
+     * drive is deaf. The previous version sent up to four hundred M-R
+     * commands back to back in exactly that state: an unthrottled stream
+     * of traffic at a drive that cannot answer, and the first one that
+     * landed inside a write hung the machine at $ED5A with no way back.
+     * It was the one rule this whole program is built around, broken in a
+     * for loop.
+     *
+     * An emulated drive always finishes inside the wait, so the loop never
+     * went round once and none of this ever showed up in VICE.
+     *
+     * Spacing them does not make any single poll safe, because nothing
+     * can. It cuts the number of attempts from four hundred to forty and
+     * gives the drive half a second between each, which turns the common
+     * case of a track running long from a hang into twenty seconds of
+     * patience.
+     */
     for (guard = 0; guard < DOS_JOB_POLLS; ++guard) {
         if (dos_mr(job_code_addr(slot), &st, 1)) {
             if ((st & 0x80) == 0) {
                 return st;
             }
         }
+        dos_delay_long(30);
     }
     return DOS_ERR_TIMEOUT;
 }

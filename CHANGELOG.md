@@ -2,6 +2,46 @@
 
 (C) 2026 Robert Mech. Licence MIT.
 
+## v1.5
+
+### Fixed
+
+- **The 1541 hang in a track at a time pass.** `dos_job_status` read the
+  job slot four hundred times with no delay between attempts, and that
+  loop only goes round when the job has not finished, which on a 1541
+  means the drive is deaf. The one state in which nothing may be sent was
+  the only state in which it sent four hundred commands back to back. An
+  emulated drive always finishes inside the wait, so the loop never went
+  round once and none of this appeared in VICE. Polls are spaced by half a
+  second and capped at forty.
+- **The zone edges.** The formatter converges a revolution byte count at
+  `$0621/$0622` against the real spindle, with no iteration limit and the
+  drive deaf throughout, and the ROM seeds it once at `$FAE8` and never
+  again. Every track inherited the previous one's value, which is wrong by
+  a whole density step at tracks 18, 25 and 31. The ROM's own figure is
+  poked back before every track.
+- **A build that silently overran its own ceiling.** The stock linker
+  configuration sizes BSS by subtraction, so outgrowing the space wrapped
+  the size rather than failing: BSS landed past the sprites with the C
+  stack inside it, linked without a warning, and drew garbage.
+  `cfg/headcrash.cfg` gives the area a checkable size.
+
+### Changed
+
+- The splash is behind `-DSPLASH` and off by default. It costs about a
+  kilobyte and the program ends a hundred or so bytes below its ceiling.
+
+### Wrong turns, recorded
+
+- v1.4 blamed the music interrupt. Disproved by disassembling the KERNAL:
+  `ISOUR` and `ACPTR` both mask interrupts for the whole of every
+  transfer, so nothing on the IRQ vector can fire inside one. The change
+  is kept because there is no reason to have a handler running during
+  drive work, but it was not the fix.
+- Before that, two rounds of blaming the track wait, including a speed
+  zone wait that produced ten bad tracks in VICE where a flat wait
+  produced none. That one is backed out.
+
 ## v1.4
 
 ### Fixed

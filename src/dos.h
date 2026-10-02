@@ -26,7 +26,7 @@
  * is a short M-R round trip, so this is a few seconds: long enough for the
  * slowest track, short enough that a wedged drive does not hang the UI.
  */
-#define DOS_JOB_POLLS   400u
+#define DOS_JOB_POLLS   40u
 
 /* Read a job slot until the controller has finished with it. Only call
  * this when the drive is known to be answering the bus.

@@ -125,24 +125,38 @@ Each of these is written up at length in `docs/DESIGN.md`. The short form:
   track is a sector write through the job queue. There is a measured wait
   in there now, `DOS_JOB_WAIT`, and the same goes for `I0`, which seeks and
   reads the BAM before it will talk again.
-- **Nothing extra goes on the interrupt vector while the drive is being
-  driven.** Serial on a C64 is bit banged by the KERNAL against the
-  drive's own timing and it only protects the parts of that it knows
-  about. A handler chained onto `$0314` adds latency to every interrupt in
-  the middle of a transfer, which an emulator forgives and a real drive
-  does not. Both hardware hangs in a track at a time pass, at track 18 and
-  at track 25, were on builds carrying the music and logo interrupt; v1.1,
-  which had none, formatted straight through. `irq_pause` takes the vector
-  off before any drive work and `irq_resume` puts it back, and nothing is
-  lost by it: the tune is finished before the format starts and the logo
-  not cycling for a minute is not a feature.
-- **Chasing the track wait was the wrong tree, twice.** Raising it from
-  four seconds to six moved the hardware hang earlier rather than later,
-  which is not how a timeout behaves, and that should have been the clue.
-  A speed zone theory was built on top of it and shipped: giving the first
-  track of each zone two and a half times the wait produced ten bad tracks
-  in VICE where a flat wait produced none. Measure before theorising, and
-  when a fix makes the symptom move the wrong way, the theory is wrong.
+- **The 1541 track hang was `dos_job_status` polling an unanswering
+  drive.** It read the job slot in a loop of four hundred with no delay
+  between attempts, and the loop only goes round when the job code still
+  has bit 7 set, which means the job has not finished, which means the
+  drive is deaf. So the one state in which nothing may be sent was the
+  only state in which it sent four hundred M-R commands back to back. An
+  emulated drive always finishes inside the wait so the loop never went
+  round once, and none of it was visible in VICE. The polls are spaced by
+  half a second and capped at forty now.
+- **The 1541 formatter's revolution estimate is not reset per track, and
+  that is why the zone edges were worst.** `$0621/$0622` holds the byte
+  count the formatter converges against the real spindle, and the ROM
+  seeds it to `$0FA0` once, at `$FAE8`, and never again, so each track
+  starts from whatever the one before it converged on. The convergence
+  loop at `$FB0C` has no iteration limit and only accepts a result when
+  two consecutive revolutions agree to within four bytes out of about
+  seven thousand seven hundred, all of it with the drive deaf: there is no
+  `CLI` anywhere between `$FB00` and `$FD8B`. VICE derives the counts from
+  exact cycles so they always agree and it exits first time, every time. A
+  real spindle does not, and at tracks 18, 25 and 31 the density changes
+  and the inherited estimate is wrong by the whole density step. `fmt.c`
+  pokes the ROM's own figure back before every track.
+- **Two wrong theories came before that one, both about the track wait.**
+  Raising it from four seconds to six moved the hardware hang earlier
+  rather than later, which is not how a timeout behaves, and that should
+  have stopped the line of thinking there. Instead a speed zone wait was
+  built on top and shipped, and it produced ten bad tracks in VICE where a
+  flat wait produced none. A third theory blamed the music interrupt and
+  was disproved in two minutes by disassembling the KERNAL: `ISOUR` at
+  `$ED40` and `ACPTR` at `$EE13` both `SEI` on entry and `CLI` on exit, so
+  nothing on the IRQ vector can fire inside a transfer at all. Check the
+  premise before building on it.
 - **Ending a format job early corrupts the drive** unless `$50` is cleared
   first: the ROM's job exit runs a GCR decode across the drive's own stack.
   The ROM's own format exit clears it at `$FD96` for that reason.
@@ -333,6 +347,12 @@ Next:
   kilobytes, which is what made it run into its own stack.
 - Starting a drive job and reading its status in the same breath. The
   emulator answers, the hardware hangs.
+- Polling anything on a drive in a tight loop. If the answer means "not
+  finished", the next question goes to a drive that cannot hear it.
+- Sizing BSS by subtraction, which is what the stock `c64.cfg` does. A
+  program that outgrows the space wraps the size instead of failing, links
+  silently, puts BSS past the sprites and starts the C stack inside it.
+  `cfg/headcrash.cfg` gives the area a size the linker can check.
 - A held noise voice for the spindle motor. It is a drone, not a drive. The
   stepper tick on its own is the sound; everything else is noise.
 - Trusting $0088 on a 1581 as a progress counter during its own N:. It is

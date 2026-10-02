@@ -39,6 +39,8 @@
 #define A41_FTNUM   0x0051u /* track the ROM formatter is working on */
 #define A41_MASTID  0x0012u /* master disk ID, drive 0 (ID1, ID2)    */
 #define A41_RETRY   0x0620u /* formatter's own retry counter         */
+#define A41_GAPLO   0x0621u /* byte count estimate for one revolution */
+#define A41_GAPHI   0x0622u /* ROM seeds it to $0FA0, once, at init   */
 #define A41_SLOT    3u      /* buffer 3, as the ROM's own N: uses    */
 
 /* How long one 1541 track can take, in video frames of about 17 ms.
@@ -189,6 +191,32 @@ unsigned char fmt_track(unsigned char track)
          * own retry counter is pinned at 1 and errors come straight back.
          */
         dos_poke(A41_RETRY, 1);
+
+        /* Put the revolution estimate back to the value the ROM starts
+         * from, before every single track.
+         *
+         * The formatter converges $0621/$0622 against the real spindle by
+         * writing a track's worth of $FF and counting the bytes that come
+         * back round, and it only accepts the result when two consecutive
+         * revolutions agree to within four bytes out of about seven
+         * thousand seven hundred. There is no iteration limit on that loop
+         * and the drive is deaf for all of it: no CLI anywhere between
+         * $FB00 and $FD8B, confirmed against the ROM.
+         *
+         * The ROM seeds the estimate once, at $FAE8, and never again, so
+         * each track inherits whatever the previous track converged on.
+         * That is fine inside a speed zone and wrong at the edge of one:
+         * the density changes at tracks 18, 25 and 31, so the first track
+         * of each zone starts out wrong by the whole density step and has
+         * to converge from there, with a loop gain of two that overshoots.
+         * Those are the tracks hardware hung on.
+         *
+         * Two pokes to a drive that is idle. The ROM's own figure is
+         * $0FA0.
+         */
+        dos_poke(A41_GAPLO, 0xa0);
+        dos_poke(A41_GAPHI, 0x0f);
+
         dos_poke(A41_FTNUM, track);
         dos_job_start(A41_SLOT, JOB_EXEC, track, 0);
 

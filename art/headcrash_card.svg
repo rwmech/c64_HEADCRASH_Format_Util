@@ -202,7 +202,7 @@
           fill="#e8be1e" stroke="#ffffff" stroke-width="0.35"/>
     <text x="78.5" y="52.3" text-anchor="middle"
           font-family="DejaVu Sans Condensed, DejaVu Sans, sans-serif"
-          font-weight="bold" font-size="4.6" fill="#000000">V1.4</text>
+          font-weight="bold" font-size="4.6" fill="#000000">V1.5</text>
 
     <!-- ============ card edge ============ -->
     <rect x="2.3" y="2.3" width="85" height="53.4" rx="2.9" ry="2.9"

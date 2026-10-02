@@ -15,8 +15,13 @@ TARGET  := c64
 # of that bank: sprites at $5000, character set at $5400, screen matrix at
 # $5c00, bitmap at $6000. That keeps it all as plain RAM with the ROMs
 # mapped in, so drawing never banks anything out, and leaves the program
-# and its stack everything below $5000.
-CFLAGS  := -t $(TARGET) -O -I src \
+# and its stack everything below $5B00.
+#
+# cfg/headcrash.cfg adds a second code region in the free RAM at $C9D1 and
+# gives BSS a size the linker can actually check. The stock c64.cfg works
+# BSS out by subtraction, so a program that outgrows its space wraps the
+# size instead of failing, links without a word, and draws garbage.
+CFLAGS  := -t $(TARGET) -O -I src -C cfg/headcrash.cfg \
            -Wl -D__HIMEM__=0x5b00 -Wl -D__STACKSIZE__=0x400
 
 BUILD   := build
