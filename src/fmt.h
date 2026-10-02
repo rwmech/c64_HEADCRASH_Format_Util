@@ -49,8 +49,11 @@ unsigned char fmt_native_start(const char *name,
  */
 unsigned int fmt_native_frames(void);
 
-/* Final DOS status, once the time is up. */
-unsigned char fmt_native_end(void);
+/* Ask the drive once whether it has finished, without waiting. Returns
+ * DOS_ERR_TIMEOUT while it is still working. The caller owns the waiting,
+ * because the caller is the one with a screen to keep moving.
+ */
+unsigned char fmt_native_poll(void);
 
 /* Release anything fmt_begin() set up in the drive. */
 void          fmt_end(void);

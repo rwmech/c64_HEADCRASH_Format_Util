@@ -249,24 +249,17 @@ unsigned int fmt_native_frames(void)
     return 5100u;
 }
 
-unsigned char fmt_native_end(void)
+/* One attempt at the drive's error channel, with no waiting of its own.
+ *
+ * This used to be a loop of two hundred attempts a second apart inside
+ * fmt.c, which is up to three minutes during which the program drew
+ * nothing, read no keys and looked for all the world like it had hung.
+ * The waiting belongs to the caller, which has a screen to keep moving and
+ * a keyboard to read.
+ */
+unsigned char fmt_native_poll(void)
 {
-    unsigned char st;
-    unsigned char tries;
-
-    /* The estimate has run out, which on real hardware means the drive is
-     * finished or nearly so. Ask, and keep asking: a drive that is still
-     * working either says nothing or says something that is not an error
-     * message, and either way the answer is to wait a little longer.
-     */
-    for (tries = 0; tries < 200; ++tries) {
-        dos_delay_long(60);
-        st = dos_status();
-        if (st != DOS_ERR_TIMEOUT) {
-            return st;
-        }
-    }
-    return DOS_ERR_TIMEOUT;
+    return dos_status();
 }
 
 /* ---------------------------------------------------------------------- */

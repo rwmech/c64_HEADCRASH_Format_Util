@@ -963,11 +963,37 @@ static void run_quick(void)
     show_track(total, total, 0);
     ui_sprite_off(0);
 
-    msg("CHECKING", UI_CYAN);
+    /* Now ask the drive whether it finished. It answers nothing until it
+     * has, so this is a wait, but it is a wait with the screen still
+     * moving and the keyboard still read: the bar sweeps, the count of
+     * seconds is on screen, and F4 still works. Ninety seconds is the cap,
+     * after which it says so rather than sitting there.
+     */
+    msg("CHECKING THE DRIVE FINISHED", UI_CYAN);
     disc_colour(UI_YELLOW);
     led(1);
-    st = fmt_native_end();
+    for (t = 0; t < 90; ++t) {
+        dos_delay_long(60);
+        show_sweep(t);
+        ui_ink(UI_GREY);
+        ui_num(VAL_X, INFO_Y, t, 2);
+        (void)poll_keys();
+        st = fmt_native_poll();
+        if (st != DOS_ERR_TIMEOUT) {
+            break;
+        }
+    }
     led(0);
+
+    if (t >= 90) {
+        disc_colour(UI_LRED);
+        msg("THE DRIVE NEVER ANSWERED. IT MAY STILL BE WORKING, "
+            "OR THE DISK MAY BE UNREADABLE", UI_LRED);
+        return;
+    }
+
+    show_bar(total, total);
+    show_track(total, total, 0);
     disc_colour(st ? UI_LRED : UI_LGREEN);
     if (st != 0) {
         msg("THE DRIVE REPORTED A PROBLEM", UI_LRED);
@@ -975,6 +1001,7 @@ static void run_quick(void)
         ui_text_pad(8, (unsigned char)(MSG_Y + 8), dos_msg, 38);
         return;
     }
+    snd_play(SND_DONE);
     msg("DONE", UI_LGREEN);
 }
 

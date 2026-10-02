@@ -38,6 +38,15 @@ VICE 3.10 with the original drive ROMs.
 - Message text was cut at 23 characters. It wraps at a space across both
   rows now, at the full width.
 
+- **The finish tune never played after a QUICK format.** Only the slow
+  path started it. Both paths play it now.
+- **The verify looked like a hang.** It was two hundred attempts a second
+  apart inside the format engine, up to three minutes during which nothing
+  was drawn and no key was read. The waiting moved out to the caller: the
+  bar sweeps, the seconds are counted on screen, F4 still works, and after
+  ninety seconds it says the drive never answered rather than sitting
+  there.
+
 ### Added
 
 - **Sound.** The stepper tick, a 24 ms noise burst per track. Two tunes on
