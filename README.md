@@ -148,11 +148,12 @@ the whole disc goes green, or red if it did not come back clean.
 
 The drive noise is one SID voice: a 24 ms noise burst on every track step
 and nothing else. A held rumble for the spindle was tried and was simply a
-drone. There are also two tunes on three voices, both Beethoven and both
-out of copyright by about a century and a half: the opening of the Fifth
-when a format starts and the first phrase of the Ode to Joy when it
-finishes, which is the one that matters when the machine is across the
-room. They are advanced a row at a time from the interrupt, so nothing ever
+drone. There are also six tunes on three voices, all out of copyright by a
+century or more, picked at random from two pools. Starting: Beethoven's
+Fifth, Eine kleine Nachtmusik, the 1812. Finishing: the Ode to Joy, the
+Rondo alla Turca, the Can Can, the 1812. The finishing ones are what
+matters when the machine is across the room, so each of those ends on a
+rising figure into a held tonic chord rather than simply stopping. They are advanced a row at a time from the interrupt, so nothing ever
 waits on a note. The master volume is half of full on purpose. F4 silences
 all of it, during a format as well as before one.
 

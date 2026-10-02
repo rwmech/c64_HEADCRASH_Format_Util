@@ -49,12 +49,18 @@ VICE 3.10 with the original drive ROMs.
 
 ### Added
 
-- **Sound.** The stepper tick, a 24 ms noise burst per track. Two tunes on
-  three voices: the opening of Beethoven's Fifth when a format starts and
-  the first phrase of the Ode to Joy when it finishes. Driven a row at a
-  time from the interrupt, so nothing waits on a note. Master volume is
-  half; this is a utility, not a game. F4 silences it, during a format as
-  well as before one.
+- **Sound.** The stepper tick, a 24 ms noise burst per track, and six
+  tunes on three voices, picked at random from two pools:
+
+  - starting: Beethoven's Fifth, Eine kleine Nachtmusik, the 1812
+  - finishing: the Ode to Joy, the Rondo alla Turca, the Can Can, the 1812
+
+  Every finishing tune ends on a rising figure into a held tonic chord, so
+  it sounds finished rather than stopped. Driven a row at a time from the
+  interrupt, so nothing waits on a note. The note table is accurate to
+  within 0.7 cents across five octaves. Master volume is half; this is a
+  utility, not a game. F4 silences it, during a format as well as before
+  one.
 - **Eight keys as reverse video buttons**, two rows across the full width,
   each with its own ink. F2 carries the mode, F3 the 1541 wait and F4 the
   sound state, so none of them needs a field on the screen.

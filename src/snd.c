@@ -67,24 +67,44 @@ static const unsigned int note_base[12] = {
 #define C2  1
 #define D2  3
 #define EB2 4
+#define E2  5
 #define F2  6
 #define G2  8
+#define A2  10
 
 #define C3  13
+#define D3  15
+#define EB3 16
 #define E3  17
 #define F3  18
+#define FS3 19
 #define G3  20
 #define A3  22
 #define B3  24
-#define EB3 16
-#define D3  15
 
 #define C4  25
 #define D4  27
+#define EB4 28
 #define E4  29
 #define F4  30
+#define FS4 31
 #define G4  32
-#define EB4 28
+#define GS4 33
+#define A4  34
+#define B4  36
+
+#define C5  37
+#define CS5 38
+#define D5  39
+#define DS5 40
+#define E5  41
+#define F5  42
+#define G5  44
+#define A5  46
+#define B5  48
+
+#define C6  49
+#define E6  53
 
 static unsigned int note_freq(unsigned char n)
 {
@@ -108,7 +128,14 @@ static unsigned int note_freq(unsigned char n)
 
 /* --- the tunes -------------------------------------------------------- */
 
-/* One row is a chord and how many frames to hold it. */
+/* One row is a chord and how many frames to hold it. A voice set to 0 is
+ * silent for that row, which is how the fast runs keep the harmony and the
+ * bass out of the way without a note per semiquaver.
+ *
+ * All six are out of copyright by a century or more. Every finishing tune
+ * ends on a rising figure into a held tonic chord, so it sounds finished
+ * rather than stopped.
+ */
 struct row {
     unsigned char v1, v2, v3, len;
 };
@@ -116,7 +143,7 @@ struct row {
 /* Beethoven, Symphony No. 5, the opening. Three short and one long,
  * twice, in octaves. About two seconds.
  */
-static const struct row tune_start[] = {
+static const struct row tune_5th[] = {
     { G4,  G3,  G2,   8 },
     { G4,  G3,  G2,   8 },
     { G4,  G3,  G2,   8 },
@@ -129,12 +156,54 @@ static const struct row tune_start[] = {
     { 0,   0,   0,    4 }
 };
 
-/* Beethoven, Symphony No. 9, the Ode to Joy, first phrase, with a third
- * below it and the root underneath. Resolved onto the tonic at the end
- * rather than left hanging on the dominant, because this one is saying
- * the job is done. About five seconds.
+/* Mozart, Eine kleine Nachtmusik, the opening two bars: the rising arpeggio
+ * on G, then the same shape on D.
  */
-static const struct row tune_done[] = {
+static const struct row tune_nacht[] = {
+    { G4,  G3,  G2,  16 },
+    { D4,  D3,  G2,  16 },
+    { G4,  G3,  G2,   8 },
+    { D4,  D3,  G2,   8 },
+    { G4,  G3,  G2,   8 },
+    { B4,  B3,  G2,   8 },
+    { D5,  D4,  G2,  20 },
+    { 0,   0,   0,    6 },
+    { D5,  D4,  D2,  16 },
+    { A4,  A3,  D2,  16 },
+    { D4,  D3,  D2,   8 },
+    { A4,  A3,  D2,   8 },
+    { D4,  D3,  D2,   8 },
+    { FS4, FS3, D2,   8 },
+    { A4,  A3,  D2,  22 },
+    { 0,   0,   0,    6 }
+};
+
+/* Tchaikovsky, 1812 Overture, the triumphal theme from the close. Used at
+ * both ends, which is why it carries its own flourish.
+ */
+static const struct row tune_1812[] = {
+    { G4,  D4,  G2,  12 },
+    { C5,  E4,  C3,  20 },
+    { C5,  E4,  C3,   8 },
+    { B4,  D4,  G2,   8 },
+    { C5,  E4,  C3,  16 },
+    { D5,  F4,  G2,  16 },
+    { E5,  G4,  C3,  24 },
+    { D5,  F4,  G2,   8 },
+    { C5,  E4,  C3,  16 },
+    { B4,  D4,  G2,  16 },
+    { C5,  E4,  C3,  28 },
+    { 0,   0,   0,    6 },
+    { E5,  C4,  C3,   8 },
+    { G5,  E4,  C3,   8 },
+    { C6,  G4,  C3,  40 },
+    { 0,   0,   0,    8 }
+};
+
+/* Beethoven, Symphony No. 9, the Ode to Joy, first phrase, with a third
+ * below it and the root underneath, resolved onto the tonic.
+ */
+static const struct row tune_joy[] = {
     { E4, C4, C3, 18 },
     { E4, C4, C3, 18 },
     { F4, A3, F3, 18 },
@@ -150,9 +219,115 @@ static const struct row tune_done[] = {
     { E4, C4, C3, 27 },
     { D4, B3, G3,  9 },
     { D4, B3, G3, 24 },
-    { C4, E3, C3, 40 },
+    { C5, E4, C3,  8 },
+    { E5, G4, C3,  8 },
+    { G5, C5, C3, 40 },
     { 0,  0,  0,   8 }
 };
+
+/* Mozart, Rondo alla Turca, the opening. Semiquaver turns on to each
+ * accented note, which is the whole character of it.
+ */
+static const struct row tune_turk[] = {
+    { B4,  0,   0,   5 },
+    { A4,  0,   0,   5 },
+    { GS4, 0,   0,   5 },
+    { A4,  0,   0,   5 },
+    { C5,  A3,  A2, 12 },
+    { D5,  0,   0,   5 },
+    { C5,  0,   0,   5 },
+    { B4,  0,   0,   5 },
+    { C5,  0,   0,   5 },
+    { E5,  C4,  A2, 12 },
+    { F5,  0,   0,   5 },
+    { E5,  0,   0,   5 },
+    { DS5, 0,   0,   5 },
+    { E5,  0,   0,   5 },
+    { B5,  GS4, E2, 10 },
+    { A5,  0,   0,   5 },
+    { G5,  0,   0,   5 },
+    { A5,  0,   0,   5 },
+    { B5,  0,   0,   5 },
+    { A5,  0,   0,   5 },
+    { G5,  0,   0,   5 },
+    { A5,  0,   0,   5 },
+    { C6,  A4,  A2, 20 },
+    { 0,   0,   0,   6 },
+    { A5,  E4,  A2,  8 },
+    { C6,  E4,  A2,  8 },
+    { E6,  A4,  A2,  8 },
+    { A5,  CS5, A2, 40 },
+    { 0,   0,   0,   8 }
+};
+
+/* Offenbach, Galop Infernal, which nobody calls that. Straight quavers,
+ * which is why it runs.
+ */
+static const struct row tune_can[] = {
+    { G4, 0,  0,   7 },
+    { C5, E4, C3,  7 },
+    { C5, E4, C3,  7 },
+    { C5, E4, C3,  7 },
+    { C5, E4, C3,  7 },
+    { C5, E4, C3,  7 },
+    { D5, F4, C3,  7 },
+    { E5, G4, C3,  7 },
+    { C5, E4, C3,  7 },
+    { D5, F4, G2,  7 },
+    { D5, F4, G2,  7 },
+    { D5, F4, G2,  7 },
+    { D5, F4, G2,  7 },
+    { D5, F4, G2,  7 },
+    { E5, G4, G2,  7 },
+    { F5, A4, G2,  7 },
+    { D5, F4, G2,  7 },
+    { E5, C4, C3,  7 },
+    { E5, C4, C3,  7 },
+    { E5, C4, C3,  7 },
+    { E5, C4, C3,  7 },
+    { F5, A4, F3,  7 },
+    { E5, G4, C3,  7 },
+    { D5, F4, G2,  7 },
+    { C5, E4, C3, 20 },
+    { 0,  0,  0,   6 },
+    { E5, C4, C3,  8 },
+    { G5, E4, C3,  8 },
+    { C6, G4, C3, 40 },
+    { 0,  0,  0,   8 }
+};
+
+/* Which tune goes where. The 1812 is in both pools because it works at
+ * either end.
+ */
+struct tune {
+    const struct row *rows;
+    unsigned char     n;
+};
+
+#define ROWS(t) { t, (unsigned char)(sizeof(t) / sizeof(t[0])) }
+
+static const struct tune pool_start[3] = {
+    ROWS(tune_5th), ROWS(tune_nacht), ROWS(tune_1812)
+};
+
+static const struct tune pool_done[4] = {
+    ROWS(tune_joy), ROWS(tune_turk), ROWS(tune_can), ROWS(tune_1812)
+};
+
+/* Enough randomness to not play the same one twice in a row. The raster
+ * register is wherever the beam happens to be when the key was pressed,
+ * which for this purpose is as good as a dice.
+ */
+static unsigned char seed;
+
+static unsigned char pick(unsigned char n)
+{
+    seed = (unsigned char)(seed * 5u
+                           + *(volatile unsigned char *)0xd012
+                           + *(volatile unsigned char *)0x00a2
+                           + 17u);
+    return (unsigned char)(seed % n);
+}
 
 /* --- the player ------------------------------------------------------- */
 
@@ -265,11 +440,13 @@ void snd_play(unsigned char which)
         return;
     }
     if (which == SND_START) {
-        tune      = tune_start;
-        tune_rows = sizeof(tune_start) / sizeof(tune_start[0]);
+        const struct tune *t = &pool_start[pick(3)];
+        tune      = t->rows;
+        tune_rows = t->n;
     } else if (which == SND_DONE) {
-        tune      = tune_done;
-        tune_rows = sizeof(tune_done) / sizeof(tune_done[0]);
+        const struct tune *t = &pool_done[pick(4)];
+        tune      = t->rows;
+        tune_rows = t->n;
     } else {
         snd_hush();
         return;
