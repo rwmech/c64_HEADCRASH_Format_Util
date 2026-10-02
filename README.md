@@ -1,3 +1,5 @@
+![HEADCRASH Format Util](art/headcrash_card_600dpi.png)
+
 # HEADCRASH Format Util
 
 A disk formatter for the Commodore 64 that formats one track at a time, so
@@ -199,7 +201,8 @@ src/main.c             screen layout, keys, the format run
 src/ui.c               hi-res bitmap interface
 src/dos.c              IEC and CBM DOS: commands, M-R/M-W, job queue, sectors
 src/fmt.c              the track at a time format engine
-src/snd.c              drive noise on the SID
+src/snd.c              drive noise and music on the SID
+art/                   the card artwork, as vector and as print renders
 src/drivecode_1541.s   the 26 byte gate that runs inside the drive
 tools/                 drivecode assembly, image helpers used by the tests
 tests/                 harnesses, each one a standalone .prg

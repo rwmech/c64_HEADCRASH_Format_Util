@@ -93,12 +93,19 @@ unsigned int fmt_track_wait = A41_TRACK_WAIT;
 /* How long the 1581's own N: takes, in frames. A whole disk, both sides,
  * measured at about 45 s under VICE; this is comfortably past it.
  */
-#define A81_FORMAT_WAIT 4200u
 
 /* One sector's worth of scratch, static because cc65 keeps locals on a
  * software stack that this would not fit on.
  */
-static unsigned char sec[256];
+/* The staging buffer for a sector, parked in the free RAM above the copy
+ * of the character set at $C000 rather than in BSS. Nothing else wants
+ * $C800, the VIC cannot see it from bank 1, and a quarter of a kilobyte
+ * back is a quarter of a kilobyte the C stack does not have to fight for.
+ * The program had squeezed the stack down to make room and the 1581 pass
+ * started failing in a different place on every run, which is what a
+ * stack running into BSS looks like.
+ */
+#define sec ((unsigned char *)0xc800)
 
 unsigned char fmt_seed_status;
 unsigned char fmt_init_status;
@@ -271,8 +278,28 @@ unsigned char fmt_native_poll(void)
  * we still need once the track pass has finished. It is also the half worth
  * leaving to the DOS, which knows its own BAM layout.
  */
-unsigned char fmt_filesystem(const char *name,
-                             unsigned char id1, unsigned char id2)
+/* How long to leave the drive strictly alone after the directory command
+ * before anything is sent to it. The 1581 formats the whole surface over
+ * again here, so it is deaf for a while in the middle of that; the 1541
+ * only writes a BAM and a directory, which is a handful of sectors.
+ */
+unsigned int fmt_fs_settle(void)
+{
+    return (unsigned int)(dos_drive_type == DRV_1581 ? 600u : 240u);
+}
+
+/* Ask once whether the directory is written. Safe on a 1581, which answers
+ * the bus throughout; on a 1541 it must not be called until the settle
+ * above has run out, because a 1541 writing a sector is deaf and the
+ * KERNAL has no timeout for it.
+ */
+unsigned char fmt_fs_poll(void)
+{
+    return dos_status();
+}
+
+unsigned char fmt_fs_start(const char *name,
+                           unsigned char id1, unsigned char id2)
 {
     unsigned char cmd[24];
     unsigned char i = 0;
@@ -308,8 +335,7 @@ unsigned char fmt_filesystem(const char *name,
             cmd[i++] = c;
         }
         dos_cmd_raw(cmd, i);
-        dos_delay_long(fmt_track_wait);
-        return dos_status();
+        return 1;
     }
 
     /* The 1581's seed was written by the format itself: the directory
@@ -335,12 +361,7 @@ unsigned char fmt_filesystem(const char *name,
     cmd[i++] = id1;
     cmd[i++] = id2;
     dos_cmd_raw(cmd, i);
-
-    /* Nothing useful to watch: the DOS sits in its own wait loop for the
-     * whole format.
-     */
-    dos_delay_long(A81_FORMAT_WAIT);
-    return dos_status();
+    return 1;
 }
 
 /* Mark every sector of a bad track as allocated, so the disk is still

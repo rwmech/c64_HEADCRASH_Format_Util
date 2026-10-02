@@ -64,6 +64,27 @@ VICE 3.10 with the original drive ROMs.
   by a fifth they landed a fifth of a pixel apart and interfered. Rings
   snap to every second radius, which leaves a clear gap between each one.
 
+- **Both slow passes locked up near the end.** The directory stage issued
+  its command and then sat blind: seventy seconds on a 1581, where the
+  drive formats the whole surface a second time, with the screen frozen
+  and no key read, and then spoke to the drive whether it was ready or
+  not. It is split now, the same way the check in QUICK mode is: the drive
+  is left alone for as long as it needs, then asked once a second, with
+  the bar sweeping and the keyboard live throughout.
+- **The 1581 slow pass failed differently on every run** once the C stack
+  had been cut to make a build fit: once at track 37, once at track 1,
+  both leaving a disk whose BAM read back as 6715 blocks free rather than
+  3160. A stack running into BSS corrupts rather than crashes. The sector
+  staging buffer moved to free RAM at $C800 and the stack went back to
+  where it was.
+- **The opening tune came out in pieces.** The KERNAL turns interrupts off
+  around every byte it puts on the serial bus and a format is nothing but
+  serial traffic, so the player hardly got a look in. The tune is allowed
+  to finish before the drive is spoken to.
+- **The disc kept its colour and its rings between runs**, so a second
+  format started on a full green disc. Both the pixels and the ink are
+  cleared at the start of every run.
+
 ### Added
 
 - **Sound.** The stepper tick, a 24 ms noise burst per track, and six

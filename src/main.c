@@ -687,6 +687,19 @@ static void show_track_unknown(unsigned char total)
     ui_num(VAL_X, (unsigned char)(INFO_Y + 2 * INFO_STEP), 0, 1);
 }
 
+/* Back to an empty disc. The rings and the colour from the last run were
+ * both still there when the next one started, so a second format began
+ * with a full green disc and filled it again underneath. Pixels and ink
+ * both have to go.
+ */
+static void reset_disc(void)
+{
+    ui_cell_blank(23, 3, 17, 13);
+    disc_colour(UI_CYAN);
+    draw_disc();
+    last_ring = 0;
+}
+
 static void show_bar(unsigned char done, unsigned char total)
 {
     unsigned int w;
@@ -944,6 +957,25 @@ static unsigned char poll_keys(void)
     return (unsigned char)(c == 3);     /* RUN/STOP */
 }
 
+/* Let the opening tune finish before the drive is spoken to.
+ *
+ * The KERNAL turns interrupts off around every byte it puts on the serial
+ * bus, and a format is nothing but serial traffic, so once it starts the
+ * player hardly gets a look in and the tune comes out in pieces. There is
+ * no clever fix: either the music waits for the drive or the drive waits
+ * for the music, and two seconds of waiting is cheaper than a tune in
+ * pieces. F4 still cuts it short.
+ */
+static void wait_for_tune(void)
+{
+    unsigned char guard;
+
+    for (guard = 0; guard < 200 && snd_busy(); ++guard) {
+        dos_delay_long(2);
+        (void)poll_keys();
+    }
+}
+
 static void run_quick(void)
 {
     unsigned char total = dos_tracks;
@@ -952,10 +984,11 @@ static void run_quick(void)
     unsigned char st;
 
     bad_count = 0;
-    last_ring = 0;
+    reset_disc();
 
     snd_play(SND_START);
     msg("FORMATTING. THE DRIVE REPORTS NOTHING UNTIL DONE", UI_CYAN);
+    wait_for_tune();
     fmt_native_start(disk_name, id1, id2);
 
     /* One step of the bar per track's worth of time. The drive is not
@@ -1024,9 +1057,11 @@ static void run_format(void)
     unsigned char total = dos_tracks;
 
     bad_count = 0;
-    last_ring = 0;
+    reset_disc();
 
     snd_play(SND_START);
+    msg("PREPARING THE DRIVE", UI_CYAN);
+    wait_for_tune();
     if (!fmt_begin(id1, id2)) {
         msg("THIS DRIVE CANNOT BE DRIVEN TRACK BY TRACK", UI_LRED);
         return;
@@ -1074,11 +1109,49 @@ static void run_format(void)
     fmt_end();
     ui_sprite_off(0);
 
+    /* The directory. On a 1581 this formats the whole surface a second
+     * time, which is why it gets the same treatment as the check in QUICK
+     * mode: the drive is left alone for as long as it needs to be, then
+     * asked once a second, with the bar sweeping and the keyboard read
+     * throughout. The old version sat blind for seventy seconds and then
+     * spoke to the drive whether it was ready or not.
+     */
     msg("WRITING THE DIRECTORY", UI_CYAN);
     disc_colour(UI_YELLOW);
     led(1);
-    st = fmt_filesystem(disk_name, id1, id2);
+    fmt_fs_start(disk_name, id1, id2);
+
+    {
+        unsigned int settle = fmt_fs_settle();
+
+        for (t = 0; settle != 0; ++t) {
+            unsigned int step = (settle > 30u) ? 30u : settle;
+
+            dos_delay_long(step);
+            settle -= step;
+            show_sweep(t);
+            (void)poll_keys();
+        }
+    }
+
+    for (t = 0; t < 120; ++t) {
+        st = fmt_fs_poll();
+        if (st != DOS_ERR_TIMEOUT) {
+            break;
+        }
+        dos_delay_long(60);
+        show_sweep((unsigned char)(t + 7));
+        (void)poll_keys();
+    }
     led(0);
+
+    if (t >= 120) {
+        disc_colour(UI_LRED);
+        msg("THE DRIVE NEVER FINISHED THE DIRECTORY", UI_LRED);
+        return;
+    }
+
+    show_bar(total, total);
     disc_colour(st ? UI_LRED : (bad_count ? UI_YELLOW : UI_LGREEN));
     if (st != 0) {
         msg("THE DIRECTORY DID NOT TAKE", UI_LRED);

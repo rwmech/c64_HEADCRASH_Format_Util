@@ -58,13 +58,21 @@ unsigned char fmt_native_poll(void);
 /* Release anything fmt_begin() set up in the drive. */
 void          fmt_end(void);
 
-/* Write the BAM and directory for an already low level formatted disk by
- * asking the DOS to do it (N: with no ID is a directory-only format).
- * name must already be unshifted PETSCII, up to 16 characters.
- * Returns the DOS error code, 0 == OK.
+/* Write the BAM and directory for an already low level formatted disk.
+ *
+ * Split into a start and a poll, because on a 1581 this formats the whole
+ * surface a second time and the old single call sat blind for seventy
+ * seconds with the screen frozen, which is indistinguishable from a
+ * lock-up and became a real one whenever a drive took longer than that.
+ *
+ * name must already be unshifted PETSCII, up to 16 characters. Call
+ * fmt_fs_start, leave the drive alone for fmt_fs_settle frames, then
+ * fmt_fs_poll until it answers something other than DOS_ERR_TIMEOUT.
  */
-unsigned char fmt_filesystem(const char *name,
-                             unsigned char id1, unsigned char id2);
+unsigned char fmt_fs_start(const char *name,
+                           unsigned char id1, unsigned char id2);
+unsigned int  fmt_fs_settle(void);
+unsigned char fmt_fs_poll(void);
 
 /* DOS status left by the directory-header seed written before the BAM is
  * rebuilt; for diagnostics.

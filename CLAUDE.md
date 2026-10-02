@@ -147,6 +147,14 @@ and the first ring through a hub cell turned half the hub cyan. Two inks in
 one shape is the same mistake as two inks in one cell, just harder to see
 coming.
 
+**The sprite pointers live in the screen matrix.** They are the last eight
+bytes of the kilobyte at `$5C00`, so anything that floods the matrix a page
+at a time writes over them. `gfx_clear` did exactly that, which pointed
+every sprite at whatever block the ink byte spelled, somewhere inside the
+program's own string table. The disc had shapes on it that looked like
+letters because they were letters. Clear a thousand bytes, not four pages,
+and keep the pointers in a table so they can be put back.
+
 What the VIC has to read out of bank 1 is the bitmap, the matrix and the
 sprites, and nothing else. The character set copy is not one of them: the
 VIC is in bitmap mode and never looks at it, it is only the source this
@@ -172,6 +180,27 @@ jiffy clock at `$A2` with a bounded spin in case interrupts are off.
 panel furniture are drawn at start up and never redrawn. Selection and
 activity are shown by writing colour bytes into the screen matrix, which is
 one store per cell.
+
+## Memory, and where the spare is
+
+The program runs from `$0801` to `$5B00`, and that ceiling is fixed by the
+sprites sitting directly under the screen matrix. It is nearly full.
+
+What is left, and worth using before squeezing anything:
+
+- `$C000`-`$C7FF` holds the copy of the character set. Not VIC visible from
+  bank 1, which is the whole point of it being there.
+- `$C800`-`$C8FF` holds the sector staging buffer in `fmt.c`.
+- `$C900`-`$CFFF` is 1792 bytes, free, and the first place to put a buffer
+  that does not need to be in BSS.
+
+**Do not pay for space out of the C stack.** `__STACKSIZE__` was cut to
+`0x300` to make a build fit and the 1581 track at a time pass started
+failing in a different place on every run: once at track 37, once at track
+1, both times leaving a disk whose BAM read back as 6715 blocks free. A
+stack running into BSS does not crash, it corrupts, and it corrupts
+differently every time. Move a buffer to `$C900` instead; the stack stays
+at `0x400`.
 
 ## Build and verify
 
