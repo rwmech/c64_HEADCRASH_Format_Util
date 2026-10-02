@@ -2,8 +2,88 @@
 
 (C) 2026 Robert Mech. Licence MIT.
 
-## v1.2
+## v1.3
 
+Tested on a real Commodore 64 with a real 1541 and a real 1581, and in
+VICE 3.10 with the original drive ROMs.
+
+### Fixed
+
+- **The finish tune never played after a QUICK format.** Only the slow
+  path started it. Both paths play it now.
+- **The verify looked like a hang.** It was two hundred attempts a second
+  apart inside the format engine, up to three minutes during which nothing
+  was drawn and no key was read. The waiting moved out to the caller: the
+  bar sweeps, the seconds are counted on screen, F4 still works, and after
+  ninety seconds it says the drive never answered rather than sitting
+  there.
+- **The colour bug, the garbage on the disc, and the track window never
+  appearing were all one fault.** `gfx_clear` flooded four whole pages of
+  the screen matrix, and the last eight bytes of the fourth page are the
+  sprite pointers, so every clear repointed all eight sprites at whatever
+  data block the ink byte happened to spell. That block lands inside the
+  program's own string table, which is why the disc had shapes on it that
+  looked like letters: they were letters. The clear writes a thousand
+  bytes now, and the pointers are held in a table and written again every
+  time a sprite is placed, so nothing can leave a sprite showing somebody
+  else's bytes.
+- **The head sprite** is a slider pad on a tapered arm now, in two sizes,
+  rather than the block nobody had actually seen yet.
+- **Moire across the disc.** Eighty tracks over thirty one pixels of
+  radius put a ring on every one, and with the horizontal radius stretched
+  by a fifth they landed a fifth of a pixel apart and interfered. Rings
+  snap to every second radius, which leaves a clear gap between each one.
+- **Both slow passes locked up near the end.** The directory stage issued
+  its command and then sat blind: seventy seconds on a 1581, where the
+  drive formats the whole surface a second time, with the screen frozen
+  and no key read, and then spoke to the drive whether it was ready or
+  not. It is split now, the same way the check in QUICK mode is: the drive
+  is left alone for as long as it needs, then asked once a second, with
+  the bar sweeping and the keyboard live throughout.
+- **The 1581 slow pass failed differently on every run** once the C stack
+  had been cut to make a build fit: once at track 37, once at track 1,
+  both leaving a disk whose BAM read back as 6715 blocks free rather than
+  3160. A stack running into BSS corrupts rather than crashes. The sector
+  staging buffer moved to free RAM at $C800 and the stack went back to
+  where it was.
+- **The opening tune came out in pieces.** The KERNAL turns interrupts off
+  around every byte it puts on the serial bus and a format is nothing but
+  serial traffic, so the player hardly got a look in. The tune is allowed
+  to finish before the drive is spoken to.
+- **The disc kept its colour and its rings between runs**, so a second
+  format started on a full green disc. Both the pixels and the ink are
+  cleared at the start of every run.
+- **The 1541 locked up writing the directory.** `dos_job` started a job
+  and read the slot back immediately: the busy signal it once waited on
+  had been removed when that turned out to wedge the drive, and nothing
+  replaced it. An emulated drive answers anyway, a real one is deaf for
+  the whole job. There is a measured wait there now, and after `I0`, which
+  seeks and reads the BAM before it will talk again.
+- **The drive lights were the wrong way round.** Green power on the left,
+  red activity to the right of it, which is how a real drive has them.
+
+### Added
+
+- **A splash screen**, drawn rather than stored. A full screen picture is
+  eight thousand bytes of bitmap and a thousand of colour and there is
+  nowhere in a single PRG to keep that, so this is the card's composition
+  drawn with the primitives the program already has: the banner and the
+  rainbow flash, the logo plate, the platter and the floor it sits on. It
+  costs a few hundred bytes of code and no image data, and it looks like
+  the rest of the screen rather than like a photograph of something else.
+  Held for two and a half seconds or until a key.
+- **Card artwork** for a TeensyROM NFC card, in `art/`: CR80 badge size as
+  vector, with print renders in both orientations and the area outside the
+  card transparent.
+
+### Changed
+
+- The splash's title is drawn at three times size by `ui_text_big` rather
+  than set in 8 by 8 text, which is a caption and not a logo. It carries no
+  platform banner: the card says COMMODORE 64 because a card has to say
+  which machine it is for, and the machine's own screen does not.
+
+## v1.2
 Tested on a real Commodore 64 with a real 1541 and a real 1581, and in
 VICE 3.10 with the original drive ROMs.
 
@@ -37,71 +117,6 @@ VICE 3.10 with the original drive ROMs.
   whether it is there and is told no five times.
 - Message text was cut at 23 characters. It wraps at a space across both
   rows now, at the full width.
-
-- **The finish tune never played after a QUICK format.** Only the slow
-  path started it. Both paths play it now.
-- **The verify looked like a hang.** It was two hundred attempts a second
-  apart inside the format engine, up to three minutes during which nothing
-  was drawn and no key was read. The waiting moved out to the caller: the
-  bar sweeps, the seconds are counted on screen, F4 still works, and after
-  ninety seconds it says the drive never answered rather than sitting
-  there.
-
-- **The colour bug, the garbage on the disc, and the track window never
-  appearing were all one fault.** `gfx_clear` flooded four whole pages of
-  the screen matrix, and the last eight bytes of the fourth page are the
-  sprite pointers, so every clear repointed all eight sprites at whatever
-  data block the ink byte happened to spell. That block lands inside the
-  program's own string table, which is why the disc had shapes on it that
-  looked like letters: they were letters. The clear writes a thousand
-  bytes now, and the pointers are held in a table and written again every
-  time a sprite is placed, so nothing can leave a sprite showing somebody
-  else's bytes.
-- **The head sprite** is a slider pad on a tapered arm now, in two sizes,
-  rather than the block nobody had actually seen yet.
-- **Moire across the disc.** Eighty tracks over thirty one pixels of
-  radius put a ring on every one, and with the horizontal radius stretched
-  by a fifth they landed a fifth of a pixel apart and interfered. Rings
-  snap to every second radius, which leaves a clear gap between each one.
-
-- **Both slow passes locked up near the end.** The directory stage issued
-  its command and then sat blind: seventy seconds on a 1581, where the
-  drive formats the whole surface a second time, with the screen frozen
-  and no key read, and then spoke to the drive whether it was ready or
-  not. It is split now, the same way the check in QUICK mode is: the drive
-  is left alone for as long as it needs, then asked once a second, with
-  the bar sweeping and the keyboard live throughout.
-- **The 1581 slow pass failed differently on every run** once the C stack
-  had been cut to make a build fit: once at track 37, once at track 1,
-  both leaving a disk whose BAM read back as 6715 blocks free rather than
-  3160. A stack running into BSS corrupts rather than crashes. The sector
-  staging buffer moved to free RAM at $C800 and the stack went back to
-  where it was.
-- **The opening tune came out in pieces.** The KERNAL turns interrupts off
-  around every byte it puts on the serial bus and a format is nothing but
-  serial traffic, so the player hardly got a look in. The tune is allowed
-  to finish before the drive is spoken to.
-- **The disc kept its colour and its rings between runs**, so a second
-  format started on a full green disc. Both the pixels and the ink are
-  cleared at the start of every run.
-
-- **The 1541 locked up writing the directory.** `dos_job` started a job
-  and read the slot back immediately: the busy signal it once waited on
-  had been removed when that turned out to wedge the drive, and nothing
-  replaced it. An emulated drive answers anyway, a real one is deaf for
-  the whole job. There is a measured wait there now, and after `I0`, which
-  seeks and reads the BAM before it will talk again.
-- **The drive lights were the wrong way round.** Green power on the left,
-  red activity to the right of it, which is how a real drive has them.
-
-- **A splash screen**, drawn rather than stored. A full screen picture is
-  eight thousand bytes of bitmap and a thousand of colour and there is
-  nowhere in a single PRG to keep that, so this is the card's composition
-  drawn with the primitives the program already has: the banner and the
-  rainbow flash, the logo plate, the platter and the floor it sits on. It
-  costs a few hundred bytes of code and no image data, and it looks like
-  the rest of the screen rather than like a photograph of something else.
-  Held for two and a half seconds or until a key.
 
 ### Added
 

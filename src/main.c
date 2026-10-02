@@ -16,7 +16,7 @@
 #include "dos.h"
 #include "fmt.h"
 
-#define VERSION "V1.2"
+#define VERSION "V1.3"
 
 /* How many times a track is attempted before it is called bad. Each
  * attempt is a whole job, drawn as it happens.

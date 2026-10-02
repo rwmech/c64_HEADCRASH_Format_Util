@@ -22,6 +22,15 @@ build.
   or copyright holder, in code, commits or documentation.
 - Commits carry no Co-Authored-By or "Generated with" line. Commit by file
   name, never `git commit -a`. Do not tag or cut releases without Rob's go.
+- **Committing is not shipping.** Work that is only in the local repository
+  is invisible: fifteen commits of fixes and documentation once sat here
+  while Rob was reading a GitHub page still showing v1.1 and being told
+  each round that the docs were updated. Push when the work is done, and
+  say plainly whether it went out.
+- **The version goes up every time the repository is pushed.** `VERSION` in
+  `src/main.c` is what is on the screen and in the card artwork, and
+  CHANGELOG.md gets the matching section. A build Rob is looking at and a
+  build being described have to be the same build.
 - C first with cc65, ca65 only where the generated code is the problem.
 - No code in chat unless asked for; the repository is the deliverable.
 - Code listings, when asked for, carry the filename, a description, whether
