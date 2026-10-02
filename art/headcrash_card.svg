@@ -2,9 +2,10 @@
 <!--
   headcrash_card.svg - label artwork for a TeensyROM NFC card.
 
-  CR80 badge stock: 85.6 x 54 mm trim, 3.18 mm corner radius, with 2 mm
-  bleed all round, so the artboard is 89.6 x 58 mm. Everything that must
-  survive the cut sits at least 3 mm inside the trim.
+  CR80 badge stock: 85.6 x 54 mm, 3.18 mm corner radius, sitting on an
+  89.6 x 58 mm artboard. The 2 mm margin around the card is transparent,
+  not bleed, so the artwork is the card shape and nothing else. Everything
+  that matters sits at least 3 mm inside the edge.
 
   Drawn to look like a Commodore 64 game box from about 1984: the blue
   banner across the top with the rainbow flash, a heavy outlined logo with
@@ -50,8 +51,11 @@
     </clipPath>
   </defs>
 
-  <!-- Bleed. Anything outside the trim is there to be cut off. -->
-  <rect width="89.6" height="58" fill="#000000"/>
+  <!-- Nothing is painted outside the trim: everything is clipped to the
+       rounded card shape, so the 2 mm margin around it comes out
+       transparent and the artwork can sit on any stock or be dropped
+       straight onto another image. There is no bleed to cut, so this
+       prints as the card and not as a card on a black page. -->
 
   <g clip-path="url(#trim)">
 
