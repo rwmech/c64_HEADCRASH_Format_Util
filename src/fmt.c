@@ -191,6 +191,7 @@ unsigned char fmt_track(unsigned char track)
         dos_poke(A41_RETRY, 1);
         dos_poke(A41_FTNUM, track);
         dos_job_start(A41_SLOT, JOB_EXEC, track, 0);
+
         dos_delay_long(fmt_track_wait);
         return dos_job_status(A41_SLOT);
     }

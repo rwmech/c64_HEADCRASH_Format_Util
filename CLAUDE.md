@@ -125,6 +125,24 @@ Each of these is written up at length in `docs/DESIGN.md`. The short form:
   track is a sector write through the job queue. There is a measured wait
   in there now, `DOS_JOB_WAIT`, and the same goes for `I0`, which seeks and
   reads the BAM before it will talk again.
+- **Nothing extra goes on the interrupt vector while the drive is being
+  driven.** Serial on a C64 is bit banged by the KERNAL against the
+  drive's own timing and it only protects the parts of that it knows
+  about. A handler chained onto `$0314` adds latency to every interrupt in
+  the middle of a transfer, which an emulator forgives and a real drive
+  does not. Both hardware hangs in a track at a time pass, at track 18 and
+  at track 25, were on builds carrying the music and logo interrupt; v1.1,
+  which had none, formatted straight through. `irq_pause` takes the vector
+  off before any drive work and `irq_resume` puts it back, and nothing is
+  lost by it: the tune is finished before the format starts and the logo
+  not cycling for a minute is not a feature.
+- **Chasing the track wait was the wrong tree, twice.** Raising it from
+  four seconds to six moved the hardware hang earlier rather than later,
+  which is not how a timeout behaves, and that should have been the clue.
+  A speed zone theory was built on top of it and shipped: giving the first
+  track of each zone two and a half times the wait produced ten bad tracks
+  in VICE where a flat wait produced none. Measure before theorising, and
+  when a fix makes the symptom move the wrong way, the theory is wrong.
 - **Ending a format job early corrupts the drive** unless `$50` is cleared
   first: the ROM's job exit runs a GCR decode across the drive's own stack.
   The ROM's own format exit clears it at `$FD96` for that reason.

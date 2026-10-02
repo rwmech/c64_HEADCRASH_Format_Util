@@ -16,7 +16,7 @@
 #include "dos.h"
 #include "fmt.h"
 
-#define VERSION "V1.3"
+#define VERSION "V1.4"
 
 /* How many times a track is attempted before it is called bad. Each
  * attempt is a whole job, drawn as it happens.
@@ -492,6 +492,38 @@ static unsigned char irq_tick(void)
     return IRQ_NOT_HANDLED;
 }
 
+/* The interrupt comes off while the drive is being driven.
+ *
+ * Serial on a C64 is bit banged by the KERNAL against the drive's own
+ * timing, and it only protects the parts of that it knows about. An extra
+ * handler on the vector adds latency to every interrupt in the middle of
+ * it, which an emulator forgives and a real drive does not: both hardware
+ * hangs in a track at a time pass happened on builds that had this
+ * running, and the version before it had none and formatted through.
+ *
+ * Nothing is lost by taking it off. The tune is finished before the format
+ * starts, by the time the format is running there is no music to advance,
+ * and the logo not cycling for a minute is not a feature anybody will
+ * miss.
+ */
+static unsigned char irq_live;
+
+static void irq_pause(void)
+{
+    if (irq_live) {
+        reset_irq();
+        irq_live = 0;
+    }
+}
+
+static void irq_resume(void)
+{
+    if (!irq_live) {
+        set_irq(irq_tick, irq_stack, IRQ_STACK_SIZE);
+        irq_live = 1;
+    }
+}
+
 /* The splash: the card, laid out the way the card is.
  *
  * Not the artwork converted. A full screen picture is eight thousand bytes
@@ -930,9 +962,11 @@ static void show_track_labels(void)
 static void probe(void)
 {
     unsigned char answered;
+    unsigned char was = irq_live;
 
     msg("LOOKING FOR THE DRIVE", UI_GREY);
     show_seg_device();
+    irq_pause();
     answered = 0;
     if (!dos_present(dev)) {
         dos_close();
@@ -944,6 +978,9 @@ static void probe(void)
     } else {
         answered = 1;
         dos_identify();
+    }
+    if (was) {
+        irq_resume();
     }
     ui_head_shape((unsigned char)(dos_drive_type != DRV_1581));
     draw_drive();
@@ -1116,6 +1153,7 @@ static void run_quick(void)
     snd_play(SND_START);
     msg("FORMATTING. THE DRIVE REPORTS NOTHING UNTIL DONE", UI_CYAN);
     wait_for_tune();
+    irq_pause();
     fmt_native_start(disk_name, id1, id2);
 
     /* One step of the bar per track's worth of time. The drive is not
@@ -1160,6 +1198,7 @@ static void run_quick(void)
 
     if (t >= 90) {
         disc_colour(UI_LRED);
+        irq_resume();
         msg("THE DRIVE NEVER ANSWERED. IT MAY STILL BE WORKING, "
             "OR THE DISK MAY BE UNREADABLE", UI_LRED);
         return;
@@ -1169,11 +1208,13 @@ static void run_quick(void)
     show_track(total, total, 0);
     disc_colour(st ? UI_LRED : UI_LGREEN);
     if (st != 0) {
+        irq_resume();
         msg("THE DRIVE REPORTED A PROBLEM", UI_LRED);
         ui_ink(UI_LRED);
         ui_text_pad(8, (unsigned char)(MSG_Y + 8), dos_msg, 38);
         return;
     }
+    irq_resume();
     snd_play(SND_DONE);
     msg("DONE", UI_LGREEN);
 }
@@ -1189,7 +1230,9 @@ static void run_format(void)
     snd_play(SND_START);
     msg("PREPARING THE DRIVE", UI_CYAN);
     wait_for_tune();
+    irq_pause();
     if (!fmt_begin(id1, id2)) {
+        irq_resume();
         msg("THIS DRIVE CANNOT BE DRIVEN TRACK BY TRACK", UI_LRED);
         return;
     }
@@ -1228,6 +1271,7 @@ static void run_format(void)
 
         if (poll_keys()) {      /* RUN/STOP */
             ui_sprite_off(0);
+            irq_resume();
             msg("STOPPED. THE DISK IS NOT USABLE", UI_LRED);
             fmt_end();
             return;
@@ -1274,6 +1318,7 @@ static void run_format(void)
 
     if (t >= 120) {
         disc_colour(UI_LRED);
+        irq_resume();
         msg("THE DRIVE NEVER FINISHED THE DIRECTORY", UI_LRED);
         return;
     }
@@ -1281,6 +1326,7 @@ static void run_format(void)
     show_bar(total, total);
     disc_colour(st ? UI_LRED : (bad_count ? UI_YELLOW : UI_LGREEN));
     if (st != 0) {
+        irq_resume();
         msg("THE DIRECTORY DID NOT TAKE", UI_LRED);
         return;
     }
@@ -1288,9 +1334,11 @@ static void run_format(void)
     if (bad_count) {
         fmt_lock_out(bad_list, (unsigned char)(bad_count > MAX_BAD
                                                ? MAX_BAD : bad_count));
+        irq_resume();
         snd_play(SND_DONE);
         msg("DONE, WITH BAD TRACKS LOCKED OUT", UI_YELLOW);
     } else {
+        irq_resume();
         snd_play(SND_DONE);
         msg("DONE", UI_LGREEN);
     }
@@ -1306,7 +1354,7 @@ int main(void)
     snd_init();
     splash();
     draw_static();
-    set_irq(irq_tick, irq_stack, IRQ_STACK_SIZE);
+    irq_resume();
     show_track_labels();
     probe();
     show_track(0, dos_tracks, 0);
@@ -1320,6 +1368,9 @@ int main(void)
      */
 #ifdef AUTORUN_WAIT
     fmt_track_wait = AUTORUN_WAIT;
+#endif
+#ifdef AUTORUN_TRACKS
+    dos_tracks = AUTORUN_TRACKS;   /* short sweeps */
 #endif
     /* Built for the test harness: format without waiting to be asked, so a
      * run can be driven from the command line. AUTORUN_SURFACE picks the

@@ -2,6 +2,23 @@
 
 (C) 2026 Robert Mech. Licence MIT.
 
+## v1.4
+
+### Fixed
+
+- **A 1541 hanging part way through a slow format.** Not the track wait,
+  which is what the previous two attempts assumed. Serial on a C64 is bit
+  banged by the KERNAL against the drive's own timing, and the music and
+  logo interrupt added latency to every interrupt in the middle of a
+  transfer. An emulator forgives that; a real drive does not. Both hangs,
+  at track 18 and at track 25, were on builds carrying that interrupt, and
+  v1.1, which had none, formatted straight through. The vector comes off
+  before any drive work and goes back afterwards. Nothing is lost: the
+  tune finishes before the format starts, and the logo not cycling for a
+  minute is not a feature.
+- The speed zone wait added while chasing the wrong cause is backed out.
+  It produced ten bad tracks in VICE where a flat wait produced none.
+
 ## v1.3
 
 Tested on a real Commodore 64 with a real 1541 and a real 1581, and in
