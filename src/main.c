@@ -492,6 +492,93 @@ static unsigned char irq_tick(void)
     return IRQ_NOT_HANDLED;
 }
 
+/* The splash: the card, at the size a C64 can draw it.
+ *
+ * Not the artwork converted. A full screen picture is eight thousand bytes
+ * of bitmap and a thousand of colour, and there is nowhere in a single PRG
+ * to keep that. This is the same composition drawn with the primitives the
+ * program already has, which costs a few hundred bytes of code and no data
+ * at all, and it comes out looking like the rest of the screen rather than
+ * like a photograph of something else.
+ *
+ * Held for about two and a half seconds, or until a key.
+ */
+static void splash(void)
+{
+    unsigned char i;
+    unsigned char n;
+
+    ui_ink(UI_BLACK);
+    ui_clear();
+
+    /* The banner, reverse video so it reads as a printed band. */
+    ui_ink(UI_LBLUE);
+    ui_reverse(1);
+    ui_text_pad(0, 16, " COMMODORE 64", 30);
+    ui_reverse(0);
+
+    /* The rainbow flash, a cell each so the colours keep apart. */
+    for (i = 0; i < 6; ++i) {
+        static const unsigned char flash[6] = {
+            UI_RED, UI_LRED, UI_YELLOW, UI_LGREEN, UI_CYAN, UI_LBLUE
+        };
+        ui_ink(flash[i]);
+        ui_fill(240u + (unsigned int)i * 12u, 16, 10, 8);
+    }
+
+    /* The logo plate: a red block three rows deep with the name knocked
+     * out of the middle one.
+     */
+    ui_ink(UI_RED);
+    ui_fill(104, 40, 112, 8);
+    ui_fill(104, 56, 112, 8);
+    ui_reverse(1);
+    ui_text_pad(104, 48, "  HEADCRASH", 14);
+    ui_reverse(0);
+
+    ui_ink(UI_YELLOW);
+    ui_text(124, 72, "FORMAT UTIL");
+
+    /* The platter, and the grid it sits over. */
+    /* The floor goes below the platter, not through it: one ink per cell
+     * means a grey line crossing a cyan ring takes the whole cell with it.
+     */
+    ui_ink(UI_DGREY);
+    for (i = 0; i < 5; ++i) {
+        ui_hline(40, 280, (unsigned char)(156 + i * 4));
+    }
+    ui_ink(UI_CYAN);
+    ui_ring(160, 120, 30);
+    ui_ring(160, 120, 24);
+    ui_ring(160, 120, 18);
+    ui_ring(160, 120, 12);
+    ui_ring(160, 120, 6);
+
+    ui_ink(UI_LGREY);
+    ui_text(136, 176, VERSION);
+    ui_ink(UI_GREY);
+    ui_text(40, 184, "(C) 2026 ROBERT MECH . MIT");
+
+    /* Drain whatever is still in the keyboard buffer first. Loading the
+     * program leaves the RUN that started it in there, and without this
+     * the splash reads that as the key that dismisses it and is gone
+     * before anyone sees it.
+     */
+    while (cbm_k_getin() != 0) {
+    }
+
+    /* Two and a half seconds, or a key, whichever comes first. */
+#ifndef SPLASH_FRAMES
+#define SPLASH_FRAMES 150u
+#endif
+    for (n = 0; n < SPLASH_FRAMES; ++n) {
+        if (cbm_k_getin() != 0) {
+            break;
+        }
+        dos_delay_long(1);
+    }
+}
+
 static void draw_static(void)
 {
     ui_ink(UI_CYAN);
@@ -1185,6 +1272,7 @@ int main(void)
 
     ui_init();
     snd_init();
+    splash();
     draw_static();
     set_irq(irq_tick, irq_stack, IRQ_STACK_SIZE);
     show_track_labels();

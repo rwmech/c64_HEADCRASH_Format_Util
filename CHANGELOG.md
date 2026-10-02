@@ -94,6 +94,15 @@ VICE 3.10 with the original drive ROMs.
 - **The drive lights were the wrong way round.** Green power on the left,
   red activity to the right of it, which is how a real drive has them.
 
+- **A splash screen**, drawn rather than stored. A full screen picture is
+  eight thousand bytes of bitmap and a thousand of colour and there is
+  nowhere in a single PRG to keep that, so this is the card's composition
+  drawn with the primitives the program already has: the banner and the
+  rainbow flash, the logo plate, the platter and the floor it sits on. It
+  costs a few hundred bytes of code and no image data, and it looks like
+  the rest of the screen rather than like a photograph of something else.
+  Held for two and a half seconds or until a key.
+
 ### Added
 
 - **Sound.** The stepper tick, a 24 ms noise burst per track, and six
