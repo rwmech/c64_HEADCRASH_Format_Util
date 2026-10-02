@@ -462,6 +462,14 @@ void ui_reverse(unsigned char on)
     gfx_inv = on ? 0xffu : 0x00u;
 }
 
+/* One character at a pixel position, so a caller can pace a line out at a
+ * character at a time instead of drawing the whole string at once.
+ */
+void ui_char(unsigned int x, unsigned char y, char c)
+{
+    draw_glyph(x, y, glyph_of((unsigned char)c));
+}
+
 void ui_text(unsigned int x, unsigned char y, const char *s)
 {
     unsigned char c;

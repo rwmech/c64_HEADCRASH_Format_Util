@@ -142,6 +142,12 @@ Text is drawn as whole cells, so it starts on a cell row. x is 16 bit
 everywhere: 320 does not fit in a byte, and the first version wrapped the
 right of the disc onto the left of the screen.
 
+The two message rows are the full width and the copyright lives in them,
+right aligned on the second row when nothing needs it and written over when
+something does. Text is laid in at 2400 baud: 240 characters a second with
+start and stop bits, four a frame at sixty frames a second, paced on the
+jiffy clock at `$A2` with a bounded spin in case interrupts are off.
+
 **Draw once, recolour after.** The drive bodies, the disc outline and the
 panel furniture are drawn at start up and never redrawn. Selection and
 activity are shown by writing colour bytes into the screen matrix, which is

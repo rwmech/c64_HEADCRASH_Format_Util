@@ -152,8 +152,17 @@ drone. F4 silences it, during a format as well as before one.
 
 The bottom two rows are the keys, as reverse video buttons. F2 and F3 and
 F4 carry their own state, so the mode, the 1541 wait and the sound have no
-fields of their own. Messages take the two rows above, wrapped at a space
-rather than cut, with the copyright sharing the right of the first.
+fields of their own.
+
+Messages take the two rows above that, at the full width, wrapped at a
+space rather than cut. The copyright lives in that space: right aligned on
+the second row whenever a message does not need the row, written over when
+one does, back again on the next message that fits on a single line.
+
+Text goes in at 2400 baud, because that is what the screen is pretending to
+be. With start and stop bits that is 240 characters a second, so four a
+frame; the longest message in the program is 66 characters and takes about
+a third of a second to arrive.
 
 ## What an emulator cannot tell you
 

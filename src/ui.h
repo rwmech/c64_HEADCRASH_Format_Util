@@ -84,6 +84,9 @@ void ui_arrow_off(void);
  */
 void ui_reverse(unsigned char on);
 
+/* One character, for a caller pacing a line out itself. */
+void ui_char(unsigned int x, unsigned char y, char c);
+
 void ui_text(unsigned int x, unsigned char y, const char *s);
 void ui_text_pad(unsigned int x, unsigned char y, const char *s,
                  unsigned char width);

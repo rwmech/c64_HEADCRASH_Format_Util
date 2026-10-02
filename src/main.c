@@ -48,9 +48,9 @@
 
 /* The device number, as a red seven segment readout. */
 #define SEG_X      164
-#define SEG_Y      32
+#define SEG_Y      24           /* level with the top of drive 1 */
 #define SEG_CX     20
-#define SEG_CY     4
+#define SEG_CY     3
 #define SEG_CW     5
 #define SEG_CH     3
 
@@ -72,7 +72,8 @@
 #define MSG_Y      168
 #define KEYS_Y     184          /* two rows of buttons, four each */
 #define KEYS2_Y    192
-#define FOOT_X     192          /* shares the message row, at the right */
+#define MSG_W      38u          /* both message rows, full width */
+#define COPY_X     152          /* 20 cells right aligned on row two */
 
 static unsigned char dev = 8;
 
@@ -378,8 +379,6 @@ static void draw_static(void)
     ui_ink(UI_GREY);
     draw_keys();
     ui_ink(UI_DGREY);
-    ui_ink(UI_DGREY);
-    ui_text(FOOT_X, MSG_Y, "(C) R MECH 2026");
 }
 
 /* ---------------------------------------------------------------------- */
@@ -427,17 +426,48 @@ static void show_name(void)
     }
 }
 
-/* The message area is two rows, not one.
+/* The message area is two rows of the full width, and the copyright lives
+ * in it: it sits right aligned on the second row whenever a message does
+ * not need that row, and a message that does need it simply writes over
+ * the top. It comes back on the next message that fits on one row.
  *
- * The first shares its row with the copyright and so gets 23 cells; the
- * second has the full 38. A message that does not fit on the first is
- * broken at the last space that does and the rest goes on the second,
- * which is what the row is there for. Nothing is cut off the end any more.
+ * Text goes in at 2400 baud, because that is what the screen is pretending
+ * to be. 2400 baud with start and stop bits is 240 characters a second,
+ * which at sixty frames a second is four characters a frame, so the budget
+ * is spent four at a time and then the code waits out a frame on the jiffy
+ * clock. The longest message in the program is 66 characters, so the worst
+ * case is about a third of a second. The wait is bounded in case something
+ * has left interrupts off and the clock is not running.
  */
-#define MSG_W1 23u
-#define MSG_W2 38u
+#define BAUD_CHARS 4u
+#define JIFFY      (*(volatile unsigned char *)0xa2)
 
-static char mbuf[MSG_W1 + 1];
+static char mbuf[MSG_W];
+static unsigned char baud_budget;
+
+static void baud_wait(void)
+{
+    unsigned char t = JIFFY;
+    unsigned int  guard = 0;
+
+    while (JIFFY == t && ++guard < 20000u) {
+    }
+}
+
+/* Clear the row, then lay n characters of s across it one at a time. */
+static void type_row(unsigned char y, const char *s, unsigned char n)
+{
+    unsigned char i;
+
+    ui_text_pad(8, y, "", MSG_W);
+    for (i = 0; i < n; ++i) {
+        ui_char(8u + (unsigned int)i * 8u, y, s[i]);
+        if (--baud_budget == 0) {
+            baud_budget = BAUD_CHARS;
+            baud_wait();
+        }
+    }
+}
 
 static void msg(const char *s, unsigned char colour)
 {
@@ -449,31 +479,37 @@ static void msg(const char *s, unsigned char colour)
     }
 
     ui_ink(colour);
+    baud_budget = BAUD_CHARS;
 
-    if (n <= MSG_W1) {
-        ui_text_pad(8, MSG_Y, s, MSG_W1);
-        ui_text_pad(8, (unsigned char)(MSG_Y + 8), "", MSG_W2);
+    if (n <= MSG_W) {
+        type_row(MSG_Y, s, n);
+        ui_ink(UI_DGREY);
+        ui_text_pad(8, (unsigned char)(MSG_Y + 8), "", MSG_W);
+        ui_text(COPY_X, (unsigned char)(MSG_Y + 8), "(C) 2026 ROBERT MECH");
         return;
     }
 
-    brk = MSG_W1;
-    for (i = MSG_W1; i > 0; --i) {
+    /* Break at the last space that fits on the first row. */
+    brk = (unsigned char)MSG_W;
+    for (i = (unsigned char)MSG_W; i > 0; --i) {
         if (s[i] == 0x20) {
             brk = i;
             break;
         }
     }
-
     for (i = 0; i < brk; ++i) {
         mbuf[i] = s[i];
     }
-    mbuf[brk] = 0;
-    ui_text_pad(8, MSG_Y, mbuf, MSG_W1);
+    type_row(MSG_Y, mbuf, brk);
 
     while (s[brk] == 0x20) {
         ++brk;
     }
-    ui_text_pad(8, (unsigned char)(MSG_Y + 8), s + brk, MSG_W2);
+    n = (unsigned char)(n - brk);
+    if (n > MSG_W) {
+        n = (unsigned char)MSG_W;
+    }
+    type_row((unsigned char)(MSG_Y + 8), s + brk, n);
 }
 
 /* The whole disc goes over to one colour, which is how the state of the
