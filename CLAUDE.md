@@ -158,6 +158,16 @@ make dist       prg plus d64 and d81 in dist/
 Needs cc65 2.19 and Python 3. Verification needs VICE 3.10 built with the
 headless UI (`--enable-headlessui`) and original drive ROMs.
 
+**And then it goes on the hardware.** Rob runs every round on a real C64
+with a real 1541 and a real 1581. The emulator proves the disks are
+correct, because an image can be read back byte by byte; the hardware is
+the only thing that settles speed, how the screen reads on a television,
+and whether it is pleasant to use. Most of the bugs that mattered came
+from there and from nowhere else: the slow redraw, the slow format, the
+empty device number that took a drive power cycle to clear, the spindle
+drone, the disc reading as broken on a CRT. Do not call something done on
+the strength of a VICE screenshot.
+
 ```
 x64sc -default -warp -ntsc -autostartprgmode 1 \
       -drive8type 1581 -drive8truedrive -8 image.d81 \
@@ -173,9 +183,9 @@ with the right name, the right ID and 664 blocks free on a 1541 or 3160 on
 a 1581.
 
 VICE is cycle accurate, which makes it good evidence about ROM behaviour
-and poor evidence about how long a real drive takes. Its 1581 is
-noticeably slower than the real thing. Timing constants come from hardware,
-not from here.
+and poor evidence about how long a real drive takes, because there is no
+motor and no disk in it. Its 1581 is noticeably slower than the real
+thing. Timing constants come from hardware, not from here.
 
 ## Roadmap
 

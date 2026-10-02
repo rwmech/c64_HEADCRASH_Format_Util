@@ -85,10 +85,34 @@ built with the headless UI, plus drive ROMs. `make test` expects `x64sc` and
 
 ## What has been verified, and where
 
-Everything below was checked by running the code in VICE 3.10 with true
-drive emulation and the original Commodore drive ROMs, then inspecting the
-resulting disk images byte by byte. Claims about ROM internals come from
-disassembling the ROM images themselves.
+Two places, and they answer different questions.
+
+### On real hardware
+
+A real Commodore 64 with a real 1541 and a real 1581. Every round of
+changes goes back onto it, and the hardware has the last word on anything
+an emulator cannot settle: how long a drive actually takes, what the screen
+actually looks like on a television, whether the thing is pleasant to use.
+
+It is also where most of the bugs worth fixing have come from. None of
+these showed up under emulation:
+
+- an interface that redrew too slowly to watch
+- a format several times slower than the drive's own
+- an empty device number leaving the bus in a state that took a drive power
+  cycle to clear
+- a held noise voice for the spindle that was a drone, not a drive
+- the disc reading as broken on a CRT
+
+The one timing constant in the program, `A41_TRACK_WAIT`, comes from
+hardware and not from here, for the reasons in the section below.
+
+### In VICE 3.10
+
+The emulator is where correctness is proved, because a disk image can be
+read back byte by byte and a real floppy cannot. All of this was checked
+with true drive emulation and the original Commodore drive ROMs; claims
+about ROM internals come from disassembling those ROM images.
 
 - Drive identification from the ROM reset vector at `$FFFC`: `$EAA0` on
   1541/1541-II/1571, `$AF24` on 1581, with `$FFE0` separating 1541 from
