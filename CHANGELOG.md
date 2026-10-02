@@ -2,6 +2,38 @@
 
 (C) 2026 Robert Mech. Licence MIT.
 
+## v1.7
+
+### Measured
+
+- **Every wait in the program is half what it says it is.** `dos_delay_long`
+  watches the raster register at `$D012` and counts transitions into zero,
+  but `$D012` holds only the low eight bits of the raster line and a frame
+  has more than 256 lines on both NTSC and PAL, so the count passes through
+  zero twice a frame: once at line 0 and again at line 256. The loop has
+  been counting half frames since it was written.
+
+  `tests/t_delay.c` times it against the jiffy clock, which the KERNAL
+  advances once a frame and which knows nothing about any of this. Asked
+  for 60 it waits 30, asked for 600 it waits 304.
+
+  So the 1541 track wait reads 6.0S on the F3 button and is three seconds.
+  A real 1541 track is about two and a bit, and longer at a zone edge where
+  the formatter's gap convergence loop runs extra revolutions. When a track
+  overruns the wait, the very next thing out of the program is an M-R to a
+  drive that is still writing, and that is the hang. The reported hangs at
+  tracks 17, 25 and 30 all sit where a track runs long.
+
+  The same arithmetic caps `wait_for_tune` at 200 frames rather than 400,
+  and the 1812 runs 242, so one start tune in three is cut off part way
+  with the player left holding a chord and `tune` still set, which also
+  silences the stepper for the rest of the run. That is why a format with
+  the music on looked different from one with it off.
+
+- Memory is not the problem, which was the other candidate. BSS ends at
+  `$5693` and the C stack starts at `$5700`, so there is no collision, and
+  the interrupt handler's own stack at `$C900` is nowhere near full.
+
 ## v1.5
 
 ### Fixed

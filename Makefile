@@ -31,7 +31,7 @@ GEN     := src/drivecode_1541.h
 
 PRG     := $(BUILD)/headcrash.prg
 
-HARNESS := t_probe t_fmt t_full t_sect
+HARNESS := t_probe t_fmt t_full t_sect t_delay
 
 .PHONY: all tests dist clean
 
