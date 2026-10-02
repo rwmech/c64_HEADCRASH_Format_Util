@@ -583,6 +583,12 @@ void dos_job_start(unsigned char slot, unsigned char code,
     dos_poke(job_code_addr(slot), code);
 }
 
+/* How long a 1541 is left alone between starting a job and reading the
+ * slot back, in frames. Measured against a sector write plus a seek,
+ * with room on top; too high only costs time, too low hangs.
+ */
+#define DOS_JOB_WAIT 90u
+
 unsigned char dos_job(unsigned char slot, unsigned char code,
                       unsigned char track, unsigned char sector)
 {
@@ -604,16 +610,21 @@ unsigned char dos_job(unsigned char slot, unsigned char code,
     dos_tag = 6;
 #endif
 
-    /* A 1541 running our drivecode holds CLK low for as long as it is deaf,
-     * so wait that out before saying a word to it. First for the signal to
-     * appear, because an idle drive spins its motor up before the job
-     * really starts, then for it to go away again.
+    /* And now wait, because the next thing this does is read the job slot
+     * back and a 1541 in the middle of a job is deaf. The busy signal this
+     * used to watch for was taken out when it turned out to wedge the
+     * drive, and nothing was put in its place: the job was started and the
+     * slot read in the same breath. An emulated drive answers anyway. A
+     * real one hangs the machine, which is what happened at the directory
+     * stage, where the very first thing after the last track is a sector
+     * write through the job queue.
      *
-     * Reading the line is a load from CIA 2, not a conversation, so neither
-     * wait can hang. If the busy signal never clears the job ended down one
-     * of the ROM's own error exits, which never come back through our gate;
-     * the drive is awake either way by then, so the job slot can be read.
+     * A seek and one sector is nothing beside a track format, so this is a
+     * second and a half rather than the track wait. A 1581 answers its bus
+     * throughout and only needs long enough for the controller to pick the
+     * job up.
      */
+    dos_delay_long(dos_drive_type == DRV_1541 ? DOS_JOB_WAIT : 8u);
 
     (void)st;
     (void)guard;

@@ -67,7 +67,10 @@ extern void gfx_barfill(void);
  * equal radii looks squashed; stretching x by six fifths puts that right.
  * Built once rather than divided per pixel.
  */
-static unsigned char xscale[81];
+/* The horizontal stretch table, parked in free RAM with the other buffers
+ * that do not need to be inside the program's own ceiling.
+ */
+#define xscale ((unsigned char *)0xc980)
 
 static void build_xscale(void)
 {

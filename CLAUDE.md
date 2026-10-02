@@ -107,6 +107,15 @@ Each of these is written up at length in `docs/DESIGN.md`. The short form:
   as empty too: cycle past an empty number and the drive that is really
   there is lost until the machine is reset. There is no KERNAL call for it.
   Write `$90` directly, before and after.
+- **A job start and a job status read are not the same breath.** `dos_job`
+  wrote the job code and then read the slot back immediately, because the
+  busy signal it used to wait on was taken out when that turned out to
+  wedge the drive, and nothing replaced it. An emulated drive answers
+  anyway; a real 1541 is deaf for the whole job and hangs the machine. It
+  showed up at the directory stage, where the first thing after the last
+  track is a sector write through the job queue. There is a measured wait
+  in there now, `DOS_JOB_WAIT`, and the same goes for `I0`, which seeks and
+  reads the BAM before it will talk again.
 - **Ending a format job early corrupts the drive** unless `$50` is cleared
   first: the ROM's job exit runs a GCR decode across the drive's own stack.
   The ROM's own format exit clears it at `$FD96` for that reason.
@@ -191,8 +200,13 @@ What is left, and worth using before squeezing anything:
 - `$C000`-`$C7FF` holds the copy of the character set. Not VIC visible from
   bank 1, which is the whole point of it being there.
 - `$C800`-`$C8FF` holds the sector staging buffer in `fmt.c`.
-- `$C900`-`$CFFF` is 1792 bytes, free, and the first place to put a buffer
-  that does not need to be in BSS.
+- `$C900`-`$C97F` holds the interrupt handler's stack.
+- `$C980`-`$C9D0` holds the horizontal stretch table.
+- `$C9D1`-`$CFFF` is about 1580 bytes, free, and the first place to put
+  anything that does not have to be inside the program's own ceiling.
+
+There are about 200 bytes left below the stack. Anything bigger than that
+goes to `$C9D1` or does not get added.
 
 **Do not pay for space out of the C stack.** `__STACKSIZE__` was cut to
 `0x300` to make a build fit and the 1581 track at a time pass started
@@ -290,6 +304,8 @@ Next:
 - Putting anything in VIC bank 1 that the VIC does not read. The character
   set copy sat in the middle of it for no reason and cost the program two
   kilobytes, which is what made it run into its own stack.
+- Starting a drive job and reading its status in the same breath. The
+  emulator answers, the hardware hangs.
 - A held noise voice for the spindle motor. It is a drone, not a drive. The
   stepper tick on its own is the sound; everything else is noise.
 - Trusting $0088 on a 1581 as a progress counter during its own N:. It is

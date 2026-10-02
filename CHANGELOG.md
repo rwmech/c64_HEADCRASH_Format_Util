@@ -85,6 +85,15 @@ VICE 3.10 with the original drive ROMs.
   format started on a full green disc. Both the pixels and the ink are
   cleared at the start of every run.
 
+- **The 1541 locked up writing the directory.** `dos_job` started a job
+  and read the slot back immediately: the busy signal it once waited on
+  had been removed when that turned out to wedge the drive, and nothing
+  replaced it. An emulated drive answers anyway, a real one is deaf for
+  the whole job. There is a measured wait there now, and after `I0`, which
+  seeks and reads the BAM before it will talk again.
+- **The drive lights were the wrong way round.** Green power on the left,
+  red activity to the right of it, which is how a real drive has them.
+
 ### Added
 
 - **Sound.** The stepper tick, a 24 ms noise burst per track, and six

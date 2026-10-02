@@ -324,8 +324,12 @@ unsigned char fmt_fs_start(const char *name,
         sec[2] = 0x41; /* 'A', CBM DOS V2.6 */
         fmt_seed_status = dos_write_sector_job(dos_dir_track, 0, sec);
 
-        /* Make the drive look at the disk it is actually holding. */
+        /* Make the drive look at the disk it is actually holding. I0 makes
+         * it seek and read the BAM, so it is deaf for a moment afterwards
+         * and the status channel cannot be read until it is done.
+         */
         dos_cmd("I0");
+        dos_delay_long(120);
         fmt_init_status = dos_status();
 
         cmd[i++] = 0x4e; /* 'N' */

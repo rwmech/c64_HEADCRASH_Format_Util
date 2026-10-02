@@ -48,7 +48,7 @@
 #define DRV_CW     18
 #define DRV_CY     4
 #define DRV_CH     4
-#define LED_CX     2            /* the activity light, its own cell */
+#define LED_CX     4            /* the activity light, its own cell */
 #define LED_CY     (DRV_CY + 1)
 
 /* The device number, as a red seven segment readout, level with the top of
@@ -149,8 +149,11 @@ static void draw_lights(void)
     /* Power, green, and the activity light in a cell of its own so that
      * showing the drive working is one colour byte and no redrawing.
      */
+    /* Green power on the left, red activity to the right of it, which is
+     * the way round a real drive has them.
+     */
     ui_ink(UI_LGREEN);
-    ui_fill(DRV_X + 26, (unsigned char)(DRV_Y + 11), 5, 5);
+    ui_fill(DRV_X + 9, (unsigned char)(DRV_Y + 11), 5, 5);
     ui_ink(UI_RED);
     ui_fill(LED_CX * 8 + 1, (unsigned char)(DRV_Y + 11), 6, 5);
 }
@@ -475,7 +478,12 @@ static void logo_tick(void)
  * is what keeps the keyboard and the jiffy clock alive, so it reports the
  * interrupt as not handled.
  */
-static unsigned char irq_stack[128];
+/* The interrupt handler's own stack, in the free RAM above the sector
+ * buffer rather than in BSS. The program is within twenty bytes of its
+ * ceiling; anything that does not have to be down there should not be.
+ */
+#define irq_stack  ((unsigned char *)0xc900)
+#define IRQ_STACK_SIZE 128u
 
 static unsigned char irq_tick(void)
 {
@@ -1178,12 +1186,21 @@ int main(void)
     ui_init();
     snd_init();
     draw_static();
-    set_irq(irq_tick, irq_stack, sizeof(irq_stack));
+    set_irq(irq_tick, irq_stack, IRQ_STACK_SIZE);
     show_track_labels();
     probe();
     show_track(0, dos_tracks, 0);
 
 #ifdef AUTORUN
+    /* The harness runs under an emulator, where a 1541 writes a track in
+     * about 156 frames. The shipped wait is six seconds because a real
+     * drive has a motor; holding the harness to that makes a 35 track pass
+     * take longer in wall time than it is worth. Build with
+     * -DAUTORUN_WAIT=n to shorten it. Nothing else reads this.
+     */
+#ifdef AUTORUN_WAIT
+    fmt_track_wait = AUTORUN_WAIT;
+#endif
     /* Built for the test harness: format without waiting to be asked, so a
      * run can be driven from the command line. AUTORUN_SURFACE picks the
      * track at a time path instead of the drive's own.
