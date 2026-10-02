@@ -11,13 +11,17 @@
 CC65    := cl65
 TARGET  := c64
 
-# The VIC is put in bank 1 so the bitmap at $4000 and the screen matrix at
-# $6000 are plain RAM with the ROMs still mapped in, which means no banking
-# while drawing. The C stack has to come down below all of that.
-CFLAGS  := -t $(TARGET) -O -I src -Wl -D__HIMEM__=0x3f00
+# The VIC is put in bank 1, with everything it reads packed against the top
+# of that bank: sprites at $5000, character set at $5400, screen matrix at
+# $5c00, bitmap at $6000. That keeps it all as plain RAM with the ROMs
+# mapped in, so drawing never banks anything out, and leaves the program
+# and its stack everything below $5000.
+CFLAGS  := -t $(TARGET) -O -I src \
+           -Wl -D__HIMEM__=0x5000 -Wl -D__STACKSIZE__=0x400
 
 BUILD   := build
 SRC     := src/main.c src/ui.c src/dos.c src/fmt.c
+ASM     := src/gfx.s
 GEN     := src/drivecode_1541.h
 
 PRG     := $(BUILD)/headcrash.prg
@@ -34,15 +38,15 @@ $(GEN): src/drivecode_1541.s tools/drivecode.cfg tools/build_drivecode.py
 	@mkdir -p $(BUILD)
 	python3 tools/build_drivecode.py
 
-$(PRG): $(SRC) $(GEN) src/dos.h src/fmt.h src/ui.h
+$(PRG): $(SRC) $(ASM) $(GEN) src/dos.h src/fmt.h src/ui.h
 	@mkdir -p $(BUILD)
-	$(CC65) $(CFLAGS) -o $@ $(SRC)
+	$(CC65) $(CFLAGS) -o $@ $(SRC) $(ASM)
 
 # Same program, but it starts formatting without being asked, so a run can
 # be driven from the command line under an emulator.
-$(BUILD)/hc_auto.prg: $(SRC) $(GEN)
+$(BUILD)/hc_auto.prg: $(SRC) $(ASM) $(GEN)
 	@mkdir -p $(BUILD)
-	$(CC65) $(CFLAGS) -DAUTORUN -o $@ $(SRC)
+	$(CC65) $(CFLAGS) -DAUTORUN -o $@ $(SRC) $(ASM)
 
 tests: $(GEN) $(BUILD)/hc_auto.prg
 	@mkdir -p $(BUILD)

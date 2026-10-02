@@ -32,6 +32,26 @@ extern unsigned int fmt_track_wait;
 /* Start a track and return immediately, for diagnostics. */
 void          fmt_track_start(unsigned char track);
 
+/* --- the drive's own format ------------------------------------------ */
+/*
+ * Straight N:, the way any other program would do it. The drive formats
+ * the whole disk in one job, which is as fast as the hardware goes and
+ * gives nothing back while it runs: a 1541 answers nothing at all, and a
+ * 1581 answers but has no counter worth reading. So this is for when the
+ * disk matters more than the view of it, and the track at a time path is
+ * for when a bad disk needs finding.
+ */
+unsigned char fmt_native_start(const char *name,
+                               unsigned char id1, unsigned char id2);
+
+/* Roughly how long that takes on this drive, in video frames. Measured,
+ * not guessed, but it is an estimate and the interface says so.
+ */
+unsigned int fmt_native_frames(void);
+
+/* Final DOS status, once the time is up. */
+unsigned char fmt_native_end(void);
+
 /* Release anything fmt_begin() set up in the drive. */
 void          fmt_end(void);
 

@@ -44,14 +44,16 @@
 /* How long one 1541 track can take, in video frames of about 17 ms.
  * Measured under VICE with a 1541 formatting back to back tracks: about
  * 190 frames per track with the motor already running, and about 210 more
- * if it has to spin up first. The default is roughly twice that, because
- * overrunning it means talking to a deaf drive, and that hangs the
- * machine rather than failing. Adjustable from the interface so it can be
- * brought down to suit a drive that is quicker than the emulator.
+ * if it has to spin up first, and a real 1541 formats a whole disk in
+ * about eighty seconds, which is a shade over two seconds a track. The
+ * default allows four, because overrunning it means talking to a deaf
+ * drive and that hangs the machine rather than failing. Adjustable from
+ * the interface, because the drive it runs on is the only authority.
  */
-#define A41_TRACK_WAIT 420u
+#define A41_TRACK_WAIT 240u
 
 unsigned int fmt_track_wait = A41_TRACK_WAIT;
+
 
 /* --- 1581 zero page and work area ------------------------------------- */
 #define A81_ENDCYL  0x008fu /* FORMATDK stops when current == this   */
@@ -158,6 +160,8 @@ unsigned char fmt_track(unsigned char track)
     }
 
     if (dos_drive_type == DRV_1581) {
+        unsigned char cyl = (unsigned char)(track - 1);
+
         /* Logical track 1..80 is physical cylinder 0..79, both sides. The
          * controller does that conversion itself when it takes the track
          * out of the job header, but FORMATDK's end marker at $8f is
@@ -165,7 +169,6 @@ unsigned char fmt_track(unsigned char track)
          * units on purpose. Checked on a $55 filled image: header 5 with
          * $8f = 4 rewrites logical track 5 and nothing else.
          */
-        unsigned char cyl = (unsigned char)(track - 1);
         dos_poke(A81_CURTRK, cyl);
         dos_poke(A81_ENDCYL, cyl);
         return dos_job(A81_SLOT, JOB_FORMAT, track, 0);
@@ -180,6 +183,61 @@ void fmt_end(void)
         /* Leave FTNUM the way the ROM leaves it after a normal format. */
         dos_poke(A41_FTNUM, 0xff);
     }
+}
+
+/* ---------------------------------------------------------------------- */
+/* the 1581's own format                                                   */
+/* ---------------------------------------------------------------------- */
+
+unsigned char fmt_native_start(const char *name,
+                               unsigned char id1, unsigned char id2)
+{
+    unsigned char cmd[24];
+    unsigned char i = 0;
+    unsigned char c;
+
+    cmd[i++] = 0x4e; /* 'N' */
+    cmd[i++] = 0x30; /* '0' */
+    cmd[i++] = 0x3a; /* ':' */
+    while ((c = (unsigned char)*name++) != 0 && i < 17) {
+        cmd[i++] = c;
+    }
+    cmd[i++] = 0x2c; /* ',' */
+    cmd[i++] = id1;
+    cmd[i++] = id2;
+    dos_cmd_raw(cmd, i);
+    return 1;
+}
+
+unsigned int fmt_native_frames(void)
+{
+    /* A 1541 takes about eighty seconds over 35 tracks, a 1581 about
+     * forty over 80. Both at sixty frames a second.
+     */
+    if (dos_drive_type == DRV_1581) {
+        return 2700u;
+    }
+    return 5100u;
+}
+
+unsigned char fmt_native_end(void)
+{
+    unsigned char st;
+    unsigned char tries;
+
+    /* The estimate has run out, which on real hardware means the drive is
+     * finished or nearly so. Ask, and keep asking: a drive that is still
+     * working either says nothing or says something that is not an error
+     * message, and either way the answer is to wait a little longer.
+     */
+    for (tries = 0; tries < 200; ++tries) {
+        dos_delay_long(60);
+        st = dos_status();
+        if (st != DOS_ERR_TIMEOUT) {
+            return st;
+        }
+    }
+    return DOS_ERR_TIMEOUT;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -232,13 +290,18 @@ unsigned char fmt_filesystem(const char *name,
         return dos_status();
     }
 
-    /* The 1581 has no way in: its block commands are refused for the same
-     * reason, and its job queue stages writes through a 512 byte physical
-     * sector that is re-read from the disk before every write, so a seed
-     * cannot be planted there either. What is left is the drive's own
-     * N: with an ID, which lays down a correct disk from nothing. It
-     * formats the surface a second time to do it, which is the price of
-     * the track by track pass that came before.
+    /* The 1581's seed was written by the format itself: the directory
+     * track was laid down with 'D' as its filler, so the DOS already sees
+     * a disk it recognises and will build the BAM and directory on it
+     * without formatting the surface all over again.
+     */
+    /* The 1581's own N: with an ID. Its block commands stay refused on a
+     * disk we laid down ourselves, and its job queue stages writes through
+     * a 512 byte physical sector that is re-read before every write, so
+     * there is no way to plant a seed the way the 1541 gets one. Laying
+     * the directory track down with 'D' as its filler gets I0 to accept
+     * the disk but not the DOS to build on it. So the drive formats the
+     * surface a second time in order to write a filesystem it trusts.
      */
     cmd[i++] = 0x4e; /* 'N' */
     cmd[i++] = 0x30; /* '0' */
@@ -251,10 +314,10 @@ unsigned char fmt_filesystem(const char *name,
     cmd[i++] = id2;
     dos_cmd_raw(cmd, i);
 
-    /* No way to watch this one: the DOS sits in its own wait loop for the
-     * whole format and answers nothing meaningful until it is done.
+    /* Nothing useful to watch: the DOS sits in its own wait loop for the
+     * whole format.
      */
-    dos_delay(A81_FORMAT_WAIT);
+    dos_delay_long(A81_FORMAT_WAIT);
     return dos_status();
 }
 

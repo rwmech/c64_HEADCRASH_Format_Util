@@ -46,7 +46,29 @@ void ui_box(unsigned int x, unsigned char y,
             unsigned int w, unsigned char h);
 void ui_fill(unsigned int x, unsigned char y,
              unsigned int w, unsigned char h);
-void ui_circle(unsigned int cx, unsigned char cy, unsigned char r);
+/* A ring that looks round on a television. r is the vertical radius; the
+ * horizontal one is stretched by a fifth to make up for the pixel shape.
+ */
+void ui_ring(unsigned int cx, unsigned char cy, unsigned char r);
+
+/* Recolour a block of cells, leaving the pixels alone. Coordinates are in
+ * cells, not pixels: 40 across, 25 down.
+ */
+void ui_cell_colour(unsigned char cx, unsigned char cy,
+                    unsigned char w, unsigned char h, unsigned char colour);
+
+/* Blank a block of cells, pixels and all. Coordinates in cells. */
+void ui_cell_blank(unsigned char cx, unsigned char cy,
+                   unsigned char w, unsigned char h);
+
+/* Fill whole cells on one cell row, which is how the progress bar is drawn
+ * fast: no masking, one store per byte.
+ */
+void ui_bar(unsigned int x, unsigned char y, unsigned int w);
+
+/* The head marker, a sprite so it can have its own colour over the disc. */
+void ui_arrow(unsigned int x, unsigned char y);
+void ui_arrow_off(void);
 
 /* Text, positioned by pixel so it can sit next to line art. Strings are
  * plain C literals; the glyphs come from the uppercase/graphics set.

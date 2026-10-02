@@ -28,19 +28,30 @@ The two drives need different handling:
   `$0600` in drive RAM, in front of the point where the controller re-enters
   the ROM formatter. See `src/drivecode_1541.s`, which explains itself.
 
+## Two ways to format
+
+**QUICK** hands the whole disk to the drive with a plain `N:`, which is as
+fast as the hardware goes. The drive says nothing while it runs, so the bar
+moves on a clock and the screen says so. This is the default.
+
+**SURFACE** drives the format one track per job. Slower, because every
+track costs serial round trips on top of the drive's own time, and it is
+the only way to see a bad track coming and keep it out of the BAM
+afterwards. F8 switches between them.
+
 ## Just run it
 
-`dist/` holds a built `headcrash.prg` and the same program on a `.d64` and a
-`.d81`, so nothing has to be compiled to try it. Releases carry the same
-three files.
+`dist/` holds a built `headcrash.prg` and the same program on a `.d64` and
+a `.d81`, so nothing has to be compiled to try it.
 
 ```
 LOAD"HEADCRASH",8,1
 RUN
 ```
 
-F1 picks the device, F3 sets the 1541 track wait, F5 names the disk, F7
-formats, RUN/STOP stops a run in progress.
+F1 cycles the drive, F5 names the disk, F8 picks the mode, F7 formats.
+RUN/STOP stops a SURFACE run in progress. In SURFACE mode on a 1541, F3
+sets how long a track is allowed.
 
 ## Build
 
@@ -75,7 +86,7 @@ disassembling the ROM images themselves.
   the right name, ID and 664 blocks free, and the same for a 1581 with 3160
   blocks free.
 - The whole thing driven from its own interface, start to finish, on both
-  drives.
+  drives and in both modes: four runs, four valid disks.
 
 ## The screen
 

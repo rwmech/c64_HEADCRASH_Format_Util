@@ -26,12 +26,13 @@
  * is a short M-R round trip, so this is a few seconds: long enough for the
  * slowest track, short enough that a wedged drive does not hang the UI.
  */
-#define DOS_JOB_POLLS   900u
+#define DOS_JOB_POLLS   400u
 
 /* Read a job slot until the controller has finished with it. Only call
  * this when the drive is known to be answering the bus.
  */
 unsigned char dos_job_status(unsigned char slot);
+
 
 /* Geometry of the selected drive, filled in by dos_identify(). */
 extern unsigned char dos_drive_type;
@@ -67,6 +68,7 @@ unsigned char dos_status(void);
 
 /* Read len bytes (1..32) of drive memory into buf. Returns 1 on success. */
 unsigned char dos_mr(unsigned int addr, unsigned char *buf, unsigned char len);
+
 
 /* Write len bytes (1..32) of drive memory from buf. */
 void          dos_mw(unsigned int addr, const unsigned char *buf,
