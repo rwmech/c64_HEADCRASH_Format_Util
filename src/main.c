@@ -69,10 +69,10 @@
 #define BAR_Y      152
 #define BAR_W      304
 #define STAT_Y     136          /* shares the ID row: 00/80 is the total */
-#define MSG_Y      176
+#define MSG_Y      168
 #define KEYS_Y     184          /* two rows of buttons, four each */
 #define KEYS2_Y    192
-#define FOOT_Y     96           /* the clear band under the drives */
+#define FOOT_X     192          /* shares the message row, at the right */
 
 static unsigned char dev = 8;
 
@@ -254,7 +254,6 @@ static void show_drive_state(unsigned char busy)
 static void led(unsigned char on)
 {
     show_drive_state(on);
-    snd_motor(on);
 }
 
 /* The head access window. On a 5.25 inch disk this is the slot cut in the
@@ -320,12 +319,25 @@ static void button(unsigned int x, unsigned char y, const char *s,
     ui_reverse(0);
 }
 
+/* F3's label when it is showing a figure: "F3 n.nS ", eight cells like
+ * every other button, with the two digits written in place.
+ */
+static char f3[9] = "F3 0.0S ";
+
 static void draw_keys(void)
 {
     button(8,   KEYS_Y, "F1 DRIVE", UI_CYAN);
     button(88,  KEYS_Y, mode == MODE_QUICK ? "F2 QUICK" : "F2 SLOW ",
            mode == MODE_QUICK ? UI_LGREEN : UI_YELLOW);
-    button(168, KEYS_Y, "F3 WAIT ", UI_GREY);
+    if (dos_drive_type == DRV_1541 && mode == MODE_SURFACE) {
+        unsigned int tenths = fmt_track_wait / 6u;
+
+        f3[3] = (char)('0' + (tenths / 10u) % 10u);
+        f3[5] = (char)('0' + tenths % 10u);
+        button(168, KEYS_Y, f3, UI_YELLOW);
+    } else {
+        button(168, KEYS_Y, "F3 WAIT ", UI_GREY);
+    }
     button(248, KEYS_Y, snd_enabled() ? "F4 SOUND" : "F4 QUIET",
            snd_enabled() ? UI_LBLUE : UI_DGREY);
 
@@ -366,7 +378,8 @@ static void draw_static(void)
     ui_ink(UI_GREY);
     draw_keys();
     ui_ink(UI_DGREY);
-    ui_text(8, FOOT_Y, "(C) 2026 ROBERT MECH");
+    ui_ink(UI_DGREY);
+    ui_text(FOOT_X, MSG_Y, "(C) R MECH 2026");
 }
 
 /* ---------------------------------------------------------------------- */
@@ -376,16 +389,16 @@ static void draw_static(void)
 /* The 1541 wait, in tenths of a second. See docs/DESIGN.md for why there
  * is a wait at all.
  */
+/* The 1541 track wait used to be printed beside the device number, which
+ * put thirteen cells of padding straight through the left of the disc and
+ * wiped eight pixel rows of it every time the screen was refreshed. That
+ * was the gap in the circle, and no amount of work on the ring was ever
+ * going to close it. It lives on the F3 button now, where it has cells of
+ * its own and nothing to collide with.
+ */
 static void show_wait(void)
 {
-    ui_ink(UI_DGREY);
-    if (dos_drive_type != DRV_1541 || mode != MODE_SURFACE) {
-        ui_text_pad(208, DOS_Y, "", 13);
-        return;
-    }
-    ui_text(208, DOS_Y, "WAIT");
-    ui_num(248, DOS_Y, (unsigned int)(fmt_track_wait / 6u), 3);
-    ui_text(272, DOS_Y, "/10S");
+    draw_keys();
 }
 
 static void show_device(void)
@@ -414,10 +427,53 @@ static void show_name(void)
     }
 }
 
+/* The message area is two rows, not one.
+ *
+ * The first shares its row with the copyright and so gets 23 cells; the
+ * second has the full 38. A message that does not fit on the first is
+ * broken at the last space that does and the rest goes on the second,
+ * which is what the row is there for. Nothing is cut off the end any more.
+ */
+#define MSG_W1 23u
+#define MSG_W2 38u
+
+static char mbuf[MSG_W1 + 1];
+
 static void msg(const char *s, unsigned char colour)
 {
+    unsigned char n = 0;
+    unsigned char brk, i;
+
+    while (s[n] != 0) {
+        ++n;
+    }
+
     ui_ink(colour);
-    ui_text_pad(8, MSG_Y, s, 38);
+
+    if (n <= MSG_W1) {
+        ui_text_pad(8, MSG_Y, s, MSG_W1);
+        ui_text_pad(8, (unsigned char)(MSG_Y + 8), "", MSG_W2);
+        return;
+    }
+
+    brk = MSG_W1;
+    for (i = MSG_W1; i > 0; --i) {
+        if (s[i] == 0x20) {
+            brk = i;
+            break;
+        }
+    }
+
+    for (i = 0; i < brk; ++i) {
+        mbuf[i] = s[i];
+    }
+    mbuf[brk] = 0;
+    ui_text_pad(8, MSG_Y, mbuf, MSG_W1);
+
+    while (s[brk] == 0x20) {
+        ++brk;
+    }
+    ui_text_pad(8, (unsigned char)(MSG_Y + 8), s + brk, MSG_W2);
 }
 
 /* The whole disc goes over to one colour, which is how the state of the
@@ -677,6 +733,26 @@ static unsigned char confirm(void)
  * news from the drive, and says so, because the alternative is a bar that
  * sits still for a minute and a half.
  */
+/* The keys that still answer while a format is running.
+ *
+ * F4 is the one that matters. A noise you cannot stop once the thing has
+ * started is worse than no noise at all, and neither format loop read the
+ * keyboard before. Returns true for RUN/STOP, which only SURFACE mode can
+ * act on: a QUICK format is one job inside the drive and stopping the C64
+ * end of it would leave the disk half written with nothing to show for it.
+ */
+static unsigned char poll_keys(void)
+{
+    unsigned char c = cbm_k_getin();
+
+    if (c == 138) {                     /* F4 */
+        snd_enable((unsigned char)(snd_enabled() ? 0 : 1));
+        draw_keys();
+        return 0;
+    }
+    return (unsigned char)(c == 3);     /* RUN/STOP */
+}
+
 static void run_quick(void)
 {
     unsigned char total = dos_tracks;
@@ -700,6 +776,7 @@ static void run_quick(void)
         show_ring(t, total, UI_CYAN);
         show_sweep(t);
         show_track_unknown(total);
+        (void)poll_keys();
     }
 
     show_ring(total, total, UI_CYAN);
@@ -767,7 +844,7 @@ static void run_format(void)
         show_bar(t, total);
         show_track(t, total, retry);
 
-        if (cbm_k_getin() == 3) { /* RUN/STOP */
+        if (poll_keys()) {      /* RUN/STOP */
             ui_arrow_off();
             msg("STOPPED. THE DISK IS NOT USABLE", UI_LRED);
             fmt_end();
@@ -866,8 +943,8 @@ int main(void)
                                                           : MODE_QUICK);
                 draw_keys();
                 msg(mode == MODE_QUICK
-                    ? "QUICK: THE DRIVE DOES IT, NO BAD TRACK CHECK"
-                    : "SURFACE: TRACK BY TRACK, SLOW, FINDS BAD ONES",
+                    ? "QUICK: THE DRIVE FORMATS THE WHOLE DISK ITSELF, NO BAD TRACK CHECK"
+                    : "SLOW: ONE TRACK AT A TIME, FINDS BAD TRACKS AND LOCKS THEM OUT",
                     UI_YELLOW);
                 break;
             case 136: /* F7 */

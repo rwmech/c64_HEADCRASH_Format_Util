@@ -48,13 +48,15 @@ build.
 ## The two modes, and why both exist
 
 - **QUICK**: hands the whole disk to the drive with a plain `N:`. As fast
-  as the hardware goes. The drive reports nothing while it runs, so the bar
-  moves on a clock and the screen says so. No bad track detection.
-- **SURFACE**: drives the format one track per job. Slower, because every
-  track costs serial round trips on top of the drive's own time, and it is
-  the only way to see a bad track coming.
+  as the hardware goes. The drive reports nothing at all while it runs, so
+  the bar sweeps and the track counter shows dashes rather than inventing
+  a figure. No bad track detection.
+- **SLOW** (SURFACE in the code): drives the format one track per job.
+  Slower, because every track costs serial round trips on top of the
+  drive's own time, and it is the only way to see a bad track coming.
 
-QUICK is the default. SURFACE is for a disk that is suspect.
+QUICK is the default. SLOW is for a disk that is suspect. The two are
+called QUICK and SLOW everywhere the user sees them.
 
 ## Hardware facts that cost real time to learn
 
@@ -80,13 +82,24 @@ Each of these is written up at length in `docs/DESIGN.md`. The short form:
   it four thousand times across a full format and gets one value, 79, from
   the first read to the last. There is no progress to read in QUICK mode on
   either drive, which is why the bar there sweeps instead of counting.
-- **Probe a device with LISTEN, not with a command.** `OPEN` to a serial
-  device does not report an absent one reliably, so a probe that opens a
-  channel and then sends an M-R leaves the bus half addressed when nobody
-  answers, and a real drive further along the chain sticks until it is
-  power cycled. `cbm_k_listen` followed by `cbm_k_readst` is the one path
-  in the serial routines with a timeout: bit 7 set means nothing is there.
-  `cbm_k_unlsn` afterwards puts the bus back either way.
+- **Probing a device takes the whole addressing sequence.** Measured with
+  `tests/t_dev.c` against a 1581 on 8 and nothing on 9 or 10:
+  - `cbm_k_open` returns 0 for present and absent alike. Useless, and this
+    is why the first version never noticed an empty device number and went
+    on to send an M-R into the dark, which left the bus half addressed and
+    stuck the real drive until it was power cycled.
+  - LISTEN followed by a read of ST is also 0 for all of them. Every device
+    on the bus pulls DATA low to acknowledge ATN, not just the one being
+    addressed, so this answers "someone is there", never "that one is".
+  - LISTEN, then `cbm_k_second($6F)`, then UNLISTEN, then read ST: 0 for 8,
+    128 for 9 and 10. The per device answer only exists once ATN has been
+    released, because that is when the devices that were not addressed let
+    DATA go. This is the one that works.
+- **ST is sticky.** The KERNAL ORs bit 7 into `$90` and never clears it, so
+  without clearing it by hand every device after the first empty one reads
+  as empty too: cycle past an empty number and the drive that is really
+  there is lost until the machine is reset. There is no KERNAL call for it.
+  Write `$90` directly, before and after.
 - **Ending a format job early corrupts the drive** unless `$50` is cleared
   first: the ROM's job exit runs a GCR decode across the drive's own stack.
   The ROM's own format exit clears it at `$FD96` for that reason.
@@ -203,6 +216,14 @@ Next:
   not re-read but fail before touching the disk.
 - 32 bit arithmetic anywhere that runs per pixel. The ellipse did and the
   redraw was visibly slow; the ring is integer with a scale table now.
+- Looking for a drawing bug in the drawing code before checking what else
+  writes to those cells. The gap in the disc was never the ring: the 1541
+  wait readout cleared thirteen cells at x=208 on cell row 13, which runs
+  straight through the left of the disc and wiped eight pixel rows of it.
+  Two rounds of work went into the ring before anyone counted the lit
+  pixels per row and found six rows blank from edge to edge. Count first.
+- A held noise voice for the spindle motor. It is a drone, not a drive. The
+  stepper tick on its own is the sound; everything else is noise.
 - Trusting $0088 on a 1581 as a progress counter during its own N:. It is
   live during a track at a time pass and not during the drive's own
   format.

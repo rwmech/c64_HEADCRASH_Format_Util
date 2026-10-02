@@ -1,9 +1,8 @@
 /* snd.h - drive noise on the SID.
  *
- * A 1541 makes two sounds worth having: the spindle motor, a low rumble
- * that runs the whole time the drive is working, and the stepper, a sharp
- * tick every time the head moves a track. Both are noise waveforms; the
- * difference is the frequency and the envelope.
+ * One sound: the stepper tick, a 24 ms noise burst every time the head
+ * moves a track. A held rumble for the spindle was tried and was simply a
+ * drone, so there is not one.
  *
  * Nothing here blocks. A click is gated and left to its own decay, so it
  * costs two stores and returns immediately, which matters because the
@@ -24,8 +23,6 @@ void snd_init(void);
 void snd_enable(unsigned char on);
 unsigned char snd_enabled(void);
 
-/* The spindle motor, held for as long as the drive is working. */
-void snd_motor(unsigned char on);
 
 /* One stepper tick. Fire and forget. */
 void snd_click(void);

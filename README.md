@@ -36,10 +36,10 @@ finished. The bar does not pretend otherwise: it sweeps to show work is
 happening and the track counter shows dashes, because there is no number to
 show. This is the default.
 
-**SURFACE** drives the format one track per job. Slower, because every
-track costs serial round trips on top of the drive's own time, and it is
-the only way to see a bad track coming and keep it out of the BAM
-afterwards. F8 switches between them.
+**SLOW** drives the format one track per job. Slower, because every track
+costs serial round trips on top of the drive's own time, and it is the only
+way to see a bad track coming and keep it out of the BAM afterwards. There
+the bar and the track counter are real figures. F2 switches between them.
 
 ## Just run it
 
@@ -55,9 +55,11 @@ The keys are along the bottom of the screen, two rows of four:
 
 ```
 F1 DRIVE   cycle the device number, 8 to 11
-F2 QUICK   switch between QUICK and SLOW (surface) formatting
-F3 WAIT    how long a 1541 track is allowed, SURFACE mode only
-F4 SOUND   drive noise on or off
+F2 QUICK   switch between QUICK and SLOW formatting, and says which
+F3 WAIT    how long a 1541 track is allowed, SLOW mode only, and
+           shows the figure on the button itself
+F4 SOUND   the stepper tick on or off, during a format as well as
+           before one
 F5 NAME    name the disk
 F6 ID      set the two character disk ID
 F7 GO      format
@@ -120,9 +122,14 @@ ring being written, and it is drawn at the size of the medium: the 5.25 inch
 one is visibly bigger than the 3.5 inch one. When the disk has been checked
 the whole disc goes green, or red if it did not come back clean.
 
-The drive noise is two SID voices, both noise: a low rumble held for as long
-as the drive is working, and a sharp tick on every track step. F4 turns it
-off.
+The drive noise is one SID voice: a 24 ms noise burst on every track step
+and nothing else. A held rumble for the spindle was tried and was simply a
+drone. F4 silences it, during a format as well as before one.
+
+The bottom two rows are the keys, as reverse video buttons. F2 and F3 and
+F4 carry their own state, so the mode, the 1541 wait and the sound have no
+fields of their own. Messages take the two rows above, wrapped at a space
+rather than cut, with the copyright sharing the right of the first.
 
 ## What an emulator cannot tell you
 

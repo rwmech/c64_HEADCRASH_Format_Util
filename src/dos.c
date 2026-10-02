@@ -75,28 +75,45 @@ void dos_delay_long(unsigned int frames)
 
 /* Is there anything at this device number at all.
  *
- * The old probe opened a command channel and started asking questions,
- * which is the wrong order: OPEN to a serial device does not report an
- * absent one reliably, so the first thing that actually touched the bus
- * was an M-R, and an M-R with nobody listening leaves the bus half
- * addressed. A real drive further along the chain then sees a sequence it
- * cannot make sense of and sticks, which is why it took a power cycle to
- * clear.
+ * Two things make this harder than it looks, and both were measured with
+ * tests/t_dev.c against a 1581 on 8 and nothing on 9 or 10.
  *
- * This asks the only question that is safe to ask first. LISTEN sends the
- * device number under ATN and the KERNAL watches for the device to pull
- * DATA in acknowledgement; nothing there means ST comes back with bit 7
- * set, and it comes back straight away because that path is the one place
- * in the serial routines that does have a timeout. UNLISTEN then puts the
- * bus back however it went, so nothing is left addressed either way.
+ * The first is that LISTEN alone tells you nothing. Every device on the
+ * bus pulls DATA low to acknowledge ATN, not just the one being addressed,
+ * so a bare LISTEN followed by a read of ST answers "someone is there" for
+ * every device number while any drive is connected. Measured: 0 for 8, 9
+ * and 10 alike. The per device answer only appears once ATN is released,
+ * because that is when the devices that were not addressed let DATA go and
+ * the one that was keeps holding it. So the sequence has to run all the
+ * way through a secondary address and an UNLISTEN before ST means
+ * anything. Measured that way: 0 for 8, 128 for 9 and 10.
+ *
+ * The KERNAL's own OPEN is no help either; it returned 0 for all three.
+ * That is why the first version of this program never noticed an empty
+ * device number and went on to send an M-R into the dark, which left the
+ * bus half addressed and stuck the real drive until it was power cycled.
+ *
+ * The second is that ST is sticky. The KERNAL ORs bit 7 into $90 and never
+ * clears it, so without clearing it by hand every device after the first
+ * empty one reads as empty too, and cycling past an empty number loses the
+ * drive that is really there until the machine is reset. There is no
+ * KERNAL call for it, so this writes $90 directly, before and after.
+ *
+ * Secondary $6F selects channel 15 and nothing more. It opens no file and
+ * leaves nothing behind once UNLISTEN has gone out.
  */
 unsigned char dos_present(unsigned char dev)
 {
     unsigned char st;
 
+    *(volatile unsigned char *)0x90 = 0;
+
     cbm_k_listen(dev);
-    st = cbm_k_readst();
+    cbm_k_second(0x6f);
     cbm_k_unlsn();
+    st = *(volatile unsigned char *)0x90;
+
+    *(volatile unsigned char *)0x90 = 0;
 
     return (unsigned char)((st & 0x80) ? 0 : 1);
 }
