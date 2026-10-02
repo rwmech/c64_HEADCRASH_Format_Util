@@ -26,10 +26,13 @@
   stack inside it, linked without a warning, and drew garbage.
   `cfg/headcrash.cfg` gives the area a checkable size.
 
-### Changed
+### Removed
 
-- The splash is behind `-DSPLASH` and off by default. It costs about a
-  kilobyte and the program ends a hundred or so bytes below its ceiling.
+- The splash screen. It cost about a kilobyte and the program ends a
+  hundred or so bytes below a ceiling fixed at `$5B00` by the sprites, so
+  it was never going to fit alongside the rest. Putting it in a second
+  code region running from the free RAM at `$C9D1` does not help either:
+  the segment still has to be stored in the file below the ceiling.
 
 ### Wrong turns, recorded
 

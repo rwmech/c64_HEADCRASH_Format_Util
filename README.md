@@ -129,15 +129,6 @@ about ROM internals come from disassembling those ROM images.
 - The whole thing driven from its own interface, start to finish, on both
   drives and in both modes: four runs, four valid disks.
 
-## The splash
-
-The card artwork at the top of this file is a print piece. What the program
-shows at start up is the same composition drawn with its own primitives:
-the Commodore banner and rainbow flash, the logo plate, the platter and the
-floor it sits on. A full screen picture would be nine kilobytes with
-nowhere to keep it; this is a few hundred bytes of code and no data at all.
-Two and a half seconds, or any key.
-
 ## The screen
 
 The VIC sits in bank 1 with everything it reads packed against the top of

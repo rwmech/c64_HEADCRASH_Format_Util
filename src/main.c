@@ -16,7 +16,7 @@
 #include "dos.h"
 #include "fmt.h"
 
-#define VERSION "V1.5"
+#define VERSION "V1.6"
 
 /* How many times a track is attempted before it is called bad. Each
  * attempt is a whole job, drawn as it happens.
@@ -523,138 +523,6 @@ static void irq_resume(void)
         irq_live = 1;
     }
 }
-
-/* The splash is compiled in only when there is room for it.
- *
- * It costs about a kilobyte and the program ends about two hundred bytes
- * below its ceiling, which is fixed at $5B00 by the sprites the VIC has to
- * read out of bank 1. Putting it in a second code region that runs from
- * the free RAM at $C9D1 does not help: the segment still has to be stored
- * in the file below the ceiling, so it costs the same space either way.
- * Build with -DSPLASH once something else has been cut.
- */
-#ifdef SPLASH
-
-/* The splash: the card, laid out the way the card is.
- *
- * Not the artwork converted. A full screen picture is eight thousand bytes
- * of bitmap and a thousand of colour, and there is nowhere in a single PRG
- * to keep that. This is the same composition drawn with the primitives the
- * program already has, and it follows the card piece for piece: the blue
- * banner with the rainbow flash, the logo plate across the width, the
- * subtitle, the yellow sticker, the platter off to the right with the arm
- * coming in off the edge of the screen and the gouge torn across it, the
- * floor receding behind, and the specifications along the bottom.
- *
- * The gouge is drawn into the bitmap rather than as a sprite on purpose.
- * One ink per cell means the cells it crosses go with it, taking the rings
- * in them along, and that is exactly what a scratch through a platter
- * looks like.
- *
- * Held for about two and a half seconds, or until a key.
- */
-#ifndef SPLASH_FRAMES
-#define SPLASH_FRAMES 150u
-#endif
-
-static void splash(void)
-{
-    unsigned char i;
-    unsigned char n;
-
-    ui_ink(UI_BLACK);
-    ui_clear();
-
-    /* --- the wordmark ------------------------------------------------ */
-    ui_ink(UI_WHITE);
-    ui_text_big(52, 16, "HEADCRASH", 3);
-    ui_ink(UI_YELLOW);
-    ui_text_big(72, 48, "FORMAT UTIL", 2);
-
-    /* --- the floor, receding to a vanishing point -------------------- */
-    ui_ink(UI_GREY);
-    for (i = 0; i < 9; ++i) {
-        signed char   dx = (signed char)(((signed char)i - 4) * 10);
-        unsigned char j;
-
-        unsigned int px = 160;
-
-        for (j = 0; j < 28; ++j) {
-            unsigned int cx = (unsigned int)(160 + (int)dx * (int)j / 8);
-
-            /* Joined, not plotted. A line this shallow moves several
-             * pixels across for every row down at the near end, and
-             * plotting the points on their own leaves it dotted.
-             */
-            if (cx > px) {
-                ui_hline(px, cx, (unsigned char)(140 + j));
-            } else {
-                ui_hline(cx, px, (unsigned char)(140 + j));
-            }
-            px = cx;
-        }
-    }
-    ui_hline(0, 319, 142);
-    ui_hline(0, 319, 145);
-    ui_hline(0, 319, 149);
-    ui_hline(0, 319, 154);
-    ui_hline(0, 319, 160);
-    ui_hline(0, 319, 167);
-
-    /* --- the platter, the arm, and the gouge -------------------------- */
-    ui_ink(UI_CYAN);
-    for (i = 0; i < 6; ++i) {
-        ui_ring(236, 104, (unsigned char)(34 - i * 6));
-    }
-
-    ui_ink(UI_LGREY);
-    ui_fill(288, 90, 32, 3);
-    ui_fill(276, 88, 12, 7);
-
-    /* The gouge. Two pixels deep, because one disappears against the
-     * rings it is supposed to be tearing through.
-     */
-    ui_ink(UI_LRED);
-    for (i = 0; i < 36; ++i) {
-        ui_hline(274u - (unsigned int)i * 2u, 275u - (unsigned int)i * 2u,
-                 (unsigned char)(94 + i / 2));
-        ui_hline(274u - (unsigned int)i * 2u, 275u - (unsigned int)i * 2u,
-                 (unsigned char)(95 + i / 2));
-    }
-
-    /* --- the sticker, and the specifications ------------------------- */
-    ui_ink(UI_YELLOW);
-    ui_reverse(1);
-    ui_text(8, 96, " QUICK AND SLOW MODES ");
-    ui_reverse(0);
-
-    ui_ink(UI_WHITE);
-    ui_text(8, 176, "DISK FORMATTER . 1541 AND 1581");
-    ui_ink(UI_GREY);
-    ui_text(8, 184, "(C) 2026 ROBERT MECH . MIT LICENCE");
-    ui_ink(UI_YELLOW);
-    ui_reverse(1);
-    ui_text(264, 176, " ");
-    ui_text(272, 176, VERSION);
-    ui_reverse(0);
-
-    /* Drain whatever is still in the keyboard buffer. Loading the program
-     * leaves the RUN that started it in there, and without this the splash
-     * reads that as the key that dismisses it and is gone before anyone
-     * sees it.
-     */
-    while (cbm_k_getin() != 0) {
-    }
-
-    for (n = 0; n < SPLASH_FRAMES; ++n) {
-        if (cbm_k_getin() != 0) {
-            break;
-        }
-        dos_delay_long(1);
-    }
-}
-
-#endif /* SPLASH */
 
 static void draw_static(void)
 {
@@ -1369,9 +1237,6 @@ int main(void)
      */
     ui_init();
     snd_init();
-#ifdef SPLASH
-    splash();
-#endif
     draw_static();
     irq_resume();
     show_track_labels();

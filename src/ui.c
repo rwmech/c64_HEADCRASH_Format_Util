@@ -593,42 +593,6 @@ void ui_char(unsigned int x, unsigned char y, char c)
     draw_glyph(x, y, glyph_of((unsigned char)c));
 }
 
-#ifdef SPLASH
-
-/* Text at two or three times size, by reading the glyph out of the
- * character set and drawing every set bit as a square block.
- *
- * The whole reason this exists is that an 8 by 8 blitter cannot make a
- * logo. Nine characters of it across a 320 pixel screen is a caption, and
- * a caption is what the splash kept coming out as. At three times size the
- * same nine characters are 216 pixels across and read as a wordmark.
- *
- * Slow, and it does not matter: it runs once, on a screen nobody is
- * waiting on.
- */
-void ui_text_big(unsigned int x, unsigned char y, const char *s,
-                 unsigned char scale)
-{
-    const unsigned char *g;
-    unsigned char c, row, bit, m;
-
-    while ((c = (unsigned char)*s++) != 0) {
-        g = CHARSET + (unsigned int)glyph_of(c) * 8u;
-        for (row = 0; row < 8; ++row) {
-            m = g[row];
-            for (bit = 0; bit < 8; ++bit) {
-                if (m & (unsigned char)(0x80u >> bit)) {
-                    ui_fill(x + (unsigned int)bit * scale,
-                            (unsigned char)(y + row * scale), scale, scale);
-                }
-            }
-        }
-        x += (unsigned int)scale * 8u;
-    }
-}
-
-#endif /* SPLASH */
-
 void ui_text(unsigned int x, unsigned char y, const char *s)
 {
     unsigned char c;

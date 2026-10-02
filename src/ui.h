@@ -91,12 +91,6 @@ void ui_reverse(unsigned char on);
 /* One character, for a caller pacing a line out itself. */
 void ui_char(unsigned int x, unsigned char y, char c);
 
-/* Text at scale times size, drawn block by block. For a logo, which an
- * 8 by 8 glyph cannot be.
- */
-void ui_text_big(unsigned int x, unsigned char y, const char *s,
-                 unsigned char scale);
-
 void ui_text(unsigned int x, unsigned char y, const char *s);
 void ui_text_pad(unsigned int x, unsigned char y, const char *s,
                  unsigned char width);
