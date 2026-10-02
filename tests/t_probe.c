@@ -1,6 +1,6 @@
 /* t_probe.c - harness: identify the drive and dump the bytes used to do it.
  * Build:  cl65 -t c64 -O -I src -o build/t_probe.prg tests/t_probe.c src/dos.c
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  */
 
 #include <stdio.h>

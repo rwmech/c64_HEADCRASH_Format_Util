@@ -1,7 +1,7 @@
 /* t_nprog.c - does a 1581 answer M-R while it runs its own N: command?
  * If it does, the drive's cylinder counter is a progress source and the
  * whole track by track pass is unnecessary on that drive.
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  */
 #include <stdio.h>
 #include <conio.h>

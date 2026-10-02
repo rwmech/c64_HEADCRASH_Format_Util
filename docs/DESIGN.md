@@ -4,7 +4,7 @@ Why the awkward parts are the way they are. Written down because every one
 of them cost a debugging round, and because the reasoning is not obvious
 from the code.
 
-(C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+(C) 2026 Robert Mech. Licence MIT.
 
 ## The drive goes deaf while it writes a track
 

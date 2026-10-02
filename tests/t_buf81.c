@@ -3,7 +3,7 @@
  * Reads a known sector with job $80 and dumps the candidate buffer
  * addresses, so the write path can address the right one.
  *
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  */
 
 #include <stdio.h>

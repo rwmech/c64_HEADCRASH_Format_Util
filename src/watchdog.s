@@ -26,7 +26,7 @@
 ;       wd_disarm();
 ;   }
 ;
-; (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+; (C) 2026 Robert Mech. Licence MIT.
 
         .export _wd_arm, _wd_disarm, _wd_release_bus
         .importzp sp                    ; cc65 software stack pointer

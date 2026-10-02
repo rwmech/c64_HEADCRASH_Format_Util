@@ -1,5 +1,5 @@
 /* t_sect.c - harness: write one sector through the block commands.
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  */
 
 #include <stdio.h>

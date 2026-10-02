@@ -3,7 +3,7 @@
 Working directives, goals and hard-won knowledge for HEADCRASH Format Util.
 Read this first. It exists so that none of it has to be rediscovered.
 
-(C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+(C) 2026 Robert Mech. Licence MIT.
 
 ## What this is
 
@@ -18,7 +18,7 @@ build.
 ## Working rules
 
 - Every copyright, licence or author line names **Robert Mech** only,
-  licence **GPL-3.0-or-later**. Never name Anthropic or Claude as an author
+  licence **MIT**. Never name Anthropic or Claude as an author
   or copyright holder, in code, commits or documentation.
 - Commits carry no Co-Authored-By or "Generated with" line. Commit by file
   name, never `git commit -a`. Do not tag or cut releases without Rob's go.
@@ -75,9 +75,18 @@ Each of these is written up at length in `docs/DESIGN.md`. The short form:
   leaves state that still breaks. Kept in the tree, not in the build. If
   it is ever finished it removes the wait entirely.
 - **A 1581 answers the bus while it formats**, so its jobs can be polled.
-  Its cylinder counter at `$0088` is live during a track-at-a-time pass but
-  not dependable during its own `N:`, which is why QUICK mode times rather
-  than reads.
+  Its cylinder counter at `$0088` is live during a track-at-a-time pass and
+  dead during its own `N:`. Measured, not assumed: `tests/t_poll.c` reads
+  it four thousand times across a full format and gets one value, 79, from
+  the first read to the last. There is no progress to read in QUICK mode on
+  either drive, which is why the bar there sweeps instead of counting.
+- **Probe a device with LISTEN, not with a command.** `OPEN` to a serial
+  device does not report an absent one reliably, so a probe that opens a
+  channel and then sends an M-R leaves the bus half addressed when nobody
+  answers, and a real drive further along the chain sticks until it is
+  power cycled. `cbm_k_listen` followed by `cbm_k_readst` is the one path
+  in the serial routines with a timeout: bit 7 set means nothing is there.
+  `cbm_k_unlsn` afterwards puts the bus back either way.
 - **Ending a format job early corrupts the drive** unless `$50` is cleared
   first: the ROM's job exit runs a GCR decode across the drive's own stack.
   The ROM's own format exit clears it at `$FD96` for that reason.
@@ -163,9 +172,15 @@ Done:
 - Full passes on both drives producing valid, readable disks
 - Retries in view, bad tracks collected, BAM lockout
 - Hi-res interface, assembly primitives, sprite head marker
-- QUICK and SURFACE modes
-- Drive bodies drawn once and recoloured, activity light, red seven
-  segment device readout cycled with F1
+- QUICK and SURFACE modes, QUICK's bar indeterminate because there is
+  nothing to count
+- Drive bodies drawn from the real front panels, drawn once and recoloured,
+  activity light, red seven segment device readout cycled with F1
+- Head carriage sprite riding the media window, sized to the medium
+- Drive noise on the SID, motor and stepper, F4 to silence it
+- Eight keys as reverse video buttons in two rows, F2 mode, F6 ID, F8 exit
+- Device probe by LISTEN, so an empty device number reports instead of
+  wedging the bus
 
 Next:
 

@@ -4,7 +4,7 @@
  * channel (secondary address 15) for M-R, M-W, M-E and ordinary DOS commands,
  * and the drive's own job queue for per-track work.
  *
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  */
 
 #ifndef DOS_H
@@ -46,6 +46,11 @@ void dos_delay_long(unsigned int frames);
 /* --- channel handling ------------------------------------------------- */
 
 /* Open the command channel on device dev (8..11). Returns 1 on success. */
+/* Whether anything answers at this device number. Safe to call on an
+ * empty bus: it addresses nobody and leaves nothing open.
+ */
+unsigned char dos_present(unsigned char dev);
+
 unsigned char dos_open(unsigned char dev);
 void          dos_close(void);
 

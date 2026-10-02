@@ -30,7 +30,7 @@
 ;
 ; Assembled to a flat binary at $0600 by tools/build_drivecode.py.
 ;
-; (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+; (C) 2026 Robert Mech. Licence MIT.
 
 FTNUM   = $51               ; ROM: track the formatter is working on
 WRTMOD  = $50               ; ROM: non-zero means "a write is in progress"

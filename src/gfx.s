@@ -14,10 +14,11 @@
 ; matrix at $5c00, a copy of the character set at $5400. All of it sits at
 ; the top of the bank so the program below it has room to grow.
 ;
-; (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+; (C) 2026 Robert Mech. Licence MIT.
 
         .export _gfx_x, _gfx_x2, _gfx_y, _gfx_col, _gfx_ch
         .export _gfx_clear, _gfx_plot, _gfx_hline, _gfx_glyph
+        .export _gfx_inv
         .export _gfx_barfill
 
 BITMAP  = $6000
@@ -39,6 +40,7 @@ _gfx_x2:  .res 2                ; right hand end for hline, inclusive
 _gfx_y:   .res 1                ; 0..199
 _gfx_col: .res 1                ; screen matrix byte: ink in the high nibble
 _gfx_ch:  .res 1                ; glyph number, 0..255
+_gfx_inv: .res 1                ; $00 normal, $ff reverse video
 
         .rodata
 ; Start of each cell row within the bitmap, which is 320 bytes per row.
@@ -254,7 +256,8 @@ _gfx_glyph:
         ldy #$07
 glyph_src:
 :       lda $ffff,y             ; operand written just above
-        sta (ptr),y
+        eor _gfx_inv            ; $ff turns the cell into a reverse video
+        sta (ptr),y             ; block with the letter knocked out of it
         dey
         bpl :-
         rts

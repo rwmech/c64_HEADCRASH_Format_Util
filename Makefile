@@ -1,5 +1,5 @@
 # HEADCRASH Format Util
-# (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+# (C) 2026 Robert Mech. Licence MIT.
 #
 # make           build build/headcrash.prg
 # make tests     build the test harnesses
@@ -20,7 +20,7 @@ CFLAGS  := -t $(TARGET) -O -I src \
            -Wl -D__HIMEM__=0x5000 -Wl -D__STACKSIZE__=0x400
 
 BUILD   := build
-SRC     := src/main.c src/ui.c src/dos.c src/fmt.c
+SRC     := src/main.c src/ui.c src/dos.c src/fmt.c src/snd.c
 ASM     := src/gfx.s
 GEN     := src/drivecode_1541.h
 

@@ -3,7 +3,7 @@
 format run shows up as a diff instead of having to be believed.
 
 usage: mkimage.py out.d64|out.d81 [fill_hex]
-(C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+(C) 2026 Robert Mech. Licence MIT.
 """
 import sys
 

@@ -3,7 +3,7 @@
 marker fill, so a single track format can be checked rather than assumed.
 
 usage: diffimage.py image.d64|image.d81 [fill_hex]
-(C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+(C) 2026 Robert Mech. Licence MIT.
 """
 import sys
 

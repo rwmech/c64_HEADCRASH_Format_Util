@@ -4,7 +4,7 @@
  * is as close as a C64 gets to the thin stroke drawings the project uses
  * elsewhere.
  *
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  */
 
 #ifndef UI_H
@@ -66,13 +66,24 @@ void ui_cell_blank(unsigned char cx, unsigned char cy,
  */
 void ui_bar(unsigned int x, unsigned char y, unsigned int w);
 
-/* The head marker, a sprite so it can have its own colour over the disc. */
+/* The head carriage, a sprite so it can have its own colour over the
+ * disc. big picks the 5.25 inch size over the 3.5 inch one. x and y are
+ * the top left of the 24 by 21 sprite in screen coordinates.
+ */
+void ui_head_shape(unsigned char big);
+
 void ui_arrow(unsigned int x, unsigned char y);
 void ui_arrow_off(void);
 
 /* Text, positioned by pixel so it can sit next to line art. Strings are
  * plain C literals; the glyphs come from the uppercase/graphics set.
  */
+/* Reverse video for the text drawn after this call: the ink fills the
+ * cell and the letters come out black. This is how the key buttons
+ * along the bottom are drawn.
+ */
+void ui_reverse(unsigned char on);
+
 void ui_text(unsigned int x, unsigned char y, const char *s);
 void ui_text_pad(unsigned int x, unsigned char y, const char *s,
                  unsigned char width);

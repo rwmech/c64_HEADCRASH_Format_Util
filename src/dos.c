@@ -3,7 +3,7 @@
  * Everything here goes through the KERNAL serial routines, so it works with
  * stock DOS, JiffyDOS, and (for the plain commands) IEC peripherals.
  *
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  *
  * Required libraries: cc65 C library (cbm.h for the KERNAL entry points).
  */
@@ -73,10 +73,43 @@ void dos_delay_long(unsigned int frames)
 /* channel handling                                                        */
 /* ---------------------------------------------------------------------- */
 
+/* Is there anything at this device number at all.
+ *
+ * The old probe opened a command channel and started asking questions,
+ * which is the wrong order: OPEN to a serial device does not report an
+ * absent one reliably, so the first thing that actually touched the bus
+ * was an M-R, and an M-R with nobody listening leaves the bus half
+ * addressed. A real drive further along the chain then sees a sequence it
+ * cannot make sense of and sticks, which is why it took a power cycle to
+ * clear.
+ *
+ * This asks the only question that is safe to ask first. LISTEN sends the
+ * device number under ATN and the KERNAL watches for the device to pull
+ * DATA in acknowledgement; nothing there means ST comes back with bit 7
+ * set, and it comes back straight away because that path is the one place
+ * in the serial routines that does have a timeout. UNLISTEN then puts the
+ * bus back however it went, so nothing is left addressed either way.
+ */
+unsigned char dos_present(unsigned char dev)
+{
+    unsigned char st;
+
+    cbm_k_listen(dev);
+    st = cbm_k_readst();
+    cbm_k_unlsn();
+
+    return (unsigned char)((st & 0x80) ? 0 : 1);
+}
+
 unsigned char dos_open(unsigned char dev)
 {
     dos_close();
     dos_dev = dev;
+
+    /* Nothing is sent to a device that has not answered its own number. */
+    if (!dos_present(dev)) {
+        return 0;
+    }
 
     cbm_k_setlfs(CMD_LFN, dev, 15);
     cbm_k_setnam("");

@@ -3,7 +3,7 @@
  * Build with -DT_DEV=8 -DT_TRACK=5 and diff the disk image afterwards to
  * see which region of the disk actually changed.
  *
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  */
 
 #include <stdio.h>

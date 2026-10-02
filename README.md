@@ -5,7 +5,7 @@ it can show you how far it has got, retry a track that fails, and tell you
 which tracks are bad. Supports the 1541 (5.25 inch, 35 tracks) and the 1581
 (3.5 inch, 80 tracks), with the 1581 as the default.
 
-(C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+(C) 2026 Robert Mech. Licence MIT.
 
 ## Why this is not just an N: command
 
@@ -31,8 +31,10 @@ The two drives need different handling:
 ## Two ways to format
 
 **QUICK** hands the whole disk to the drive with a plain `N:`, which is as
-fast as the hardware goes. The drive says nothing while it runs, so the bar
-moves on a clock and the screen says so. This is the default.
+fast as the hardware goes, and the drive says nothing at all until it is
+finished. The bar does not pretend otherwise: it sweeps to show work is
+happening and the track counter shows dashes, because there is no number to
+show. This is the default.
 
 **SURFACE** drives the format one track per job. Slower, because every
 track costs serial round trips on top of the drive's own time, and it is
@@ -49,9 +51,20 @@ LOAD"HEADCRASH",8,1
 RUN
 ```
 
-F1 cycles the drive, F5 names the disk, F8 picks the mode, F7 formats.
-RUN/STOP stops a SURFACE run in progress. In SURFACE mode on a 1541, F3
-sets how long a track is allowed.
+The keys are along the bottom of the screen, two rows of four:
+
+```
+F1 DRIVE   cycle the device number, 8 to 11
+F2 QUICK   switch between QUICK and SLOW (surface) formatting
+F3 WAIT    how long a 1541 track is allowed, SURFACE mode only
+F4 SOUND   drive noise on or off
+F5 NAME    name the disk
+F6 ID      set the two character disk ID
+F7 GO      format
+F8 EXIT    back to BASIC
+```
+
+RUN/STOP stops a SURFACE run in progress.
 
 ## Build
 
@@ -90,18 +103,26 @@ disassembling the ROM images themselves.
 
 ## The screen
 
-The VIC sits in bank 1, with the bitmap at `$4000` and the screen matrix at
-`$6000`, so everything it reads is plain RAM with the ROMs still mapped in
-and drawing never has to bank anything out. The C stack comes down to
-`$3f00` to stay clear of it.
+The VIC sits in bank 1 with everything it reads packed against the top of
+the bank: sprites at `$5000`, the character set at `$5400`, the screen
+matrix at `$5c00` and the bitmap at `$6000`. All of it is plain RAM with the
+ROMs still mapped in, so drawing never has to bank anything out, and the
+program gets everything below `$5000`.
 
 One ink per 8x8 cell is the rule the layout is built around: the panels, the
 disc and the bar keep to their own cells, which is why there are no two
 coloured things touching anywhere on the screen.
 
 The disc fills in from the outside as tracks are laid down, one ring per
-track where the radius allows and shared rings where it does not. The track
-counter is the exact figure; the disc is the shape of the progress.
+track where the radius allows and shared rings where it does not. The head
+carriage is a sprite riding the window where the media is exposed, on the
+ring being written, and it is drawn at the size of the medium: the 5.25 inch
+one is visibly bigger than the 3.5 inch one. When the disk has been checked
+the whole disc goes green, or red if it did not come back clean.
+
+The drive noise is two SID voices, both noise: a low rumble held for as long
+as the drive is working, and a sharp tick on every track step. F4 turns it
+off.
 
 ## What an emulator cannot tell you
 
@@ -131,6 +152,7 @@ src/main.c             screen layout, keys, the format run
 src/ui.c               hi-res bitmap interface
 src/dos.c              IEC and CBM DOS: commands, M-R/M-W, job queue, sectors
 src/fmt.c              the track at a time format engine
+src/snd.c              drive noise on the SID
 src/drivecode_1541.s   the 26 byte gate that runs inside the drive
 tools/                 drivecode assembly, image helpers used by the tests
 tests/                 harnesses, each one a standalone .prg

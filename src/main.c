@@ -3,7 +3,7 @@
  * A formatter that works one track at a time so it can show you what it is
  * doing, retry a track that fails and tell you which ones are bad.
  *
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  *
  * Required libraries: cc65 C library (cbm.h for the KERNAL entry points).
  */
@@ -11,6 +11,7 @@
 #include <string.h>
 #include <cbm.h>
 #include "ui.h"
+#include "snd.h"
 #include "dos.h"
 #include "fmt.h"
 
@@ -34,7 +35,7 @@
  */
 #define DRV_X      8
 #define DRV_W      144
-#define DRV_H      32
+#define DRV_H      28
 #define DRV1_Y     24           /* 1581, cell rows 3..6  */
 #define DRV2_Y     64           /* 1541, cell rows 8..11 */
 #define DRV_CX     1            /* in cells */
@@ -42,7 +43,7 @@
 #define DRV1_CY    3
 #define DRV2_CY    8
 #define DRV_CH     4
-#define LED_CX     17           /* the activity light, its own cell */
+#define LED_CX     3            /* the activity light, its own cell */
 #define LED_OFFY   8
 
 /* The device number, as a red seven segment readout. */
@@ -67,10 +68,11 @@
 #define BAR_X      8
 #define BAR_Y      152
 #define BAR_W      304
-#define STAT_Y     168
+#define STAT_Y     136          /* shares the ID row: 00/80 is the total */
 #define MSG_Y      176
-#define KEYS_Y     184
-#define FOOT_Y     192
+#define KEYS_Y     184          /* two rows of buttons, four each */
+#define KEYS2_Y    192
+#define FOOT_Y     96           /* the clear band under the drives */
 
 static unsigned char dev = 8;
 
@@ -100,55 +102,85 @@ static unsigned char mode = MODE_QUICK;
 /* static furniture                                                        */
 /* ---------------------------------------------------------------------- */
 
-/* A drive, drawn once: case, front bezel, slot, a badge strip and an
- * activity light. Line art rather than a photograph, but with enough of
- * the real thing's proportions to be recognisable at a glance.
+/* The two drives, drawn from what their front panels actually look like
+ * rather than from a generic box. What separates them at this size is not
+ * the case, which is a wide low box on both, but the hole in it:
+ *
+ * 1541: a 5.25 inch slot is 146 mm across a 200 mm front, so it takes up
+ * most of the width and is tall enough to see. The spring loaded latch
+ * stands proud of it in the middle, which is the feature nobody mistakes
+ * for anything else. Two lights at the left, green for power and red for
+ * activity; the 1541-II has them the other way round.
+ *
+ * 1581: a 3.5 inch mechanism behind the same width of case, so the slot is
+ * 90 mm in a 200 mm front and sits in a recessed bezel with the eject
+ * button hard against its right hand end. Small hole, lots of case.
+ *
+ * Both are drawn once at start up. Selection and activity are colour only.
  */
 static void draw_drive_body(unsigned char y, unsigned char kind)
 {
     unsigned int x = DRV_X;
+    unsigned char ym = (unsigned char)(y + DRV_H / 2);
+    unsigned char lip = (unsigned char)(y + DRV_H - 7);
+    unsigned char bot = (unsigned char)(y + DRV_H - 1);
 
     ui_ink(UI_CYAN);
 
-    /* Case, with a lighter top edge to suggest the moulding. */
-    ui_box(x, y, DRV_W, DRV_H);
-    ui_hline(x + 3, x + DRV_W - 4, (unsigned char)(y + 3));
+    /* Case. The lower part of both steps out a little, and that lip is
+     * most of what gives either drive its shape head on.
+     */
+    ui_hline(x + 2, x + DRV_W - 3, y);
+    ui_vline(x + 2, y, lip);
+    ui_vline(x + DRV_W - 3, y, lip);
+    ui_hline(x, x + 2, lip);
+    ui_hline(x + DRV_W - 3, x + DRV_W - 1, lip);
+    ui_vline(x, lip, bot);
+    ui_vline(x + DRV_W - 1, lip, bot);
+    ui_hline(x, x + DRV_W - 1, bot);
 
-    /* Front bezel. */
-    ui_box(x + 6, (unsigned char)(y + 7), DRV_W - 12, DRV_H - 13);
-
-    if (kind == DRV_1581) {
-        /* 3.5 inch: a short slot with the shutter lip above it and the
-         * eject button to its right.
+    if (kind == DRV_1541) {
+        /* The slot: wide, and deep enough that a disk would go in it. Its
+         * top and bottom edges stop either side of the latch, so the latch
+         * reads as standing in front of the slot rather than over it.
          */
-        ui_box(x + 16, (unsigned char)(y + 12), 56, 7);
-        ui_hline(x + 20, x + 60, (unsigned char)(y + 10));
-        ui_box(x + 80, (unsigned char)(y + 13), 10, 5);
+        ui_hline(x + 34, x + 70, (unsigned char)(ym - 6));
+        ui_hline(x + 90, x + 126, (unsigned char)(ym - 6));
+        ui_hline(x + 34, x + 70, (unsigned char)(ym + 6));
+        ui_hline(x + 90, x + 126, (unsigned char)(ym + 6));
+        ui_vline(x + 34, (unsigned char)(ym - 6), (unsigned char)(ym + 6));
+        ui_vline(x + 126, (unsigned char)(ym - 6), (unsigned char)(ym + 6));
+
+        /* The latch, proud above and below the slot, with a raised face. */
+        ui_box(x + 71, (unsigned char)(ym - 10), 18, 21);
+        ui_box(x + 75, (unsigned char)(ym - 6), 10, 13);
     } else {
-        /* 5.25 inch: a long slot with the door seam across it and the
-         * latch standing proud on the left.
-         */
-        ui_box(x + 14, (unsigned char)(y + 11), 84, 9);
-        ui_hline(x + 16, x + 96, (unsigned char)(y + 15));
-        ui_box(x + 8, (unsigned char)(y + 9), 4, 13);
+        /* Recessed bezel, the small slot in it, then the eject button. */
+        ui_box(x + 34, (unsigned char)(ym - 9), 96, 19);
+        ui_box(x + 44, (unsigned char)(ym - 4), 54, 8);
+        ui_hline(x + 47, x + 95, ym);
+        ui_box(x + 106, (unsigned char)(ym - 3), 11, 6);
     }
 
-    /* Badge strip along the bottom of the bezel. */
-    ui_ink(UI_DGREY);
-    ui_hline(x + 16, x + 96, (unsigned char)(y + DRV_H - 9));
+    /* Power light, in the clear strip at the left of the case, with the
+     * activity light beside it.
+     */
+    ui_ink(UI_LGREEN);
+    ui_fill(x + 8, (unsigned char)(ym - 2), 5, 5);
 
-    /* The activity light, filled so that only its colour has to change. */
     ui_ink(UI_RED);
-    ui_fill(DRV_X + (LED_CX - DRV_CX) * 8 + 1,
-            (unsigned char)(y + LED_OFFY), 6, 5);
+    ui_fill(DRV_X + (LED_CX - DRV_CX) * 8 + 1, (unsigned char)(ym - 2), 6, 5);
 }
 
 /* Seven segment digits, the way a drive number ought to be shown. Each
  * segment is a short bar two pixels thick; the table is one bit per
  * segment, a at the top going clockwise with g in the middle.
  */
-#define SEG_W 14
-#define SEG_H 22
+/* Small enough to read as an indicator rather than a headline, and a
+ * one pixel stroke so it sits with the rest of the line art.
+ */
+#define SEG_W 10
+#define SEG_H 16
 
 static const unsigned char seg_digit[10] = {
     0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f
@@ -159,7 +191,7 @@ static void draw_seg(unsigned int x, unsigned char y, unsigned char d)
     unsigned char m = seg_digit[d % 10];
     unsigned char i;
 
-    for (i = 0; i < 2; ++i) {
+    for (i = 0; i < 1; ++i) {
         if (m & 0x01) {                      /* a, top */
             ui_hline(x + 3, x + SEG_W - 3, (unsigned char)(y + i));
         }
@@ -194,7 +226,7 @@ static void show_seg_device(void)
     ui_cell_blank(SEG_CX, SEG_CY, SEG_CW, SEG_CH);
     ui_ink(UI_LRED);
     draw_seg(SEG_X, SEG_Y, (unsigned char)(dev / 10));
-    draw_seg(SEG_X + SEG_W + 4, SEG_Y, (unsigned char)(dev % 10));
+    draw_seg(SEG_X + SEG_W + 3, SEG_Y, (unsigned char)(dev % 10));
 }
 
 /* Which drive is selected, and whether its light is on. Both are colour
@@ -216,9 +248,44 @@ static void show_drive_state(unsigned char busy)
                    (sel41 && busy) ? UI_LRED : UI_DGREY);
 }
 
+/* The activity light and the spindle motor are the same fact about the
+ * drive, so they are shown and heard from one call.
+ */
 static void led(unsigned char on)
 {
     show_drive_state(on);
+    snd_motor(on);
+}
+
+/* The head access window. On a 5.25 inch disk this is the slot cut in the
+ * jacket that the head writes through, so it runs from just clear of the
+ * hub out to near the edge, with rounded ends. It is drawn over the rings
+ * and put back after each one, because what it exposes is the media the
+ * rings are being laid down on, not a hole in the picture.
+ */
+#define SLOT_X   248u
+#define SLOT_W   14u
+#define SLOT_Y1  ((unsigned char)(DISC_CY + 15))
+#define SLOT_Y2  ((unsigned char)(DISC_CY + 42))
+
+static void draw_slot(void)
+{
+    ui_ink(UI_LGREY);
+    ui_vline(SLOT_X, (unsigned char)(SLOT_Y1 + 3), (unsigned char)(SLOT_Y2 - 3));
+    ui_vline(SLOT_X + SLOT_W, (unsigned char)(SLOT_Y1 + 3),
+             (unsigned char)(SLOT_Y2 - 3));
+    ui_hline(SLOT_X + 3, SLOT_X + SLOT_W - 3, SLOT_Y1);
+    ui_hline(SLOT_X + 3, SLOT_X + SLOT_W - 3, SLOT_Y2);
+
+    /* Two pixels a corner is all the rounding a slot this size needs. */
+    ui_plot(SLOT_X + 1, (unsigned char)(SLOT_Y1 + 2));
+    ui_plot(SLOT_X + 2, (unsigned char)(SLOT_Y1 + 1));
+    ui_plot(SLOT_X + SLOT_W - 1, (unsigned char)(SLOT_Y1 + 2));
+    ui_plot(SLOT_X + SLOT_W - 2, (unsigned char)(SLOT_Y1 + 1));
+    ui_plot(SLOT_X + 1, (unsigned char)(SLOT_Y2 - 2));
+    ui_plot(SLOT_X + 2, (unsigned char)(SLOT_Y2 - 1));
+    ui_plot(SLOT_X + SLOT_W - 1, (unsigned char)(SLOT_Y2 - 2));
+    ui_plot(SLOT_X + SLOT_W - 2, (unsigned char)(SLOT_Y2 - 1));
 }
 
 static void draw_disc(void)
@@ -228,6 +295,44 @@ static void draw_disc(void)
     ui_ring(DISC_CX, DISC_CY, DISC_RMIN);
     ui_ink(UI_DGREY);
     ui_ring(DISC_CX, DISC_CY, (unsigned char)(DISC_RMIN - 5));
+    draw_slot();
+}
+
+
+/* The key row, drawn as reverse video buttons across the full width.
+ *
+ * Eight keys in two rows of four. Each label is exactly eight characters,
+ * so the buttons line up on a grid of 8, 88, 168 and 248 with two cells of
+ * air between them, and every one gets its own ink. Reverse video keeps a
+ * button inside its own cells, which is what makes eight colours along the
+ * bottom of a one ink per cell screen possible at all.
+ *
+ * Two of them carry state rather than a fixed label: F2 says which kind of
+ * format will run and F4 says whether the drive noise is on, so there is
+ * no separate field on the screen for either.
+ */
+static void button(unsigned int x, unsigned char y, const char *s,
+                   unsigned char colour)
+{
+    ui_ink(colour);
+    ui_reverse(1);
+    ui_text(x, y, s);
+    ui_reverse(0);
+}
+
+static void draw_keys(void)
+{
+    button(8,   KEYS_Y, "F1 DRIVE", UI_CYAN);
+    button(88,  KEYS_Y, mode == MODE_QUICK ? "F2 QUICK" : "F2 SLOW ",
+           mode == MODE_QUICK ? UI_LGREEN : UI_YELLOW);
+    button(168, KEYS_Y, "F3 WAIT ", UI_GREY);
+    button(248, KEYS_Y, snd_enabled() ? "F4 SOUND" : "F4 QUIET",
+           snd_enabled() ? UI_LBLUE : UI_DGREY);
+
+    button(8,   KEYS2_Y, "F5 NAME ", UI_WHITE);
+    button(88,  KEYS2_Y, "F6 ID   ", UI_LRED);
+    button(168, KEYS2_Y, "F7 GO   ", UI_LGREEN);
+    button(248, KEYS2_Y, "F8 EXIT ", UI_DGREY);
 }
 
 static void draw_static(void)
@@ -259,9 +364,9 @@ static void draw_static(void)
     ui_box(BAR_X, (unsigned char)(BAR_Y - 2), BAR_W, 12);
 
     ui_ink(UI_GREY);
-    ui_text(8, KEYS_Y, "F1 DRIVE F5 NAME F8 MODE F7 GO");
+    draw_keys();
     ui_ink(UI_DGREY);
-    ui_text(8, FOOT_Y, "(C) 2026 ROBERT MECH  GPL-3.0+");
+    ui_text(8, FOOT_Y, "(C) 2026 ROBERT MECH");
 }
 
 /* ---------------------------------------------------------------------- */
@@ -307,26 +412,52 @@ static void show_name(void)
         idbuf[2] = 0;
         ui_text(VAL_X, (unsigned char)(FIELD_Y + 1 * FIELD_STEP), idbuf);
     }
-    ui_ink(UI_DGREY);
-    if (dos_drive_type != DRV_UNKNOWN) {
-        ui_num(VAL_X + 48, (unsigned char)(FIELD_Y + 1 * FIELD_STEP),
-               dos_tracks, 2);
-        ui_text(VAL_X + 72, (unsigned char)(FIELD_Y + 1 * FIELD_STEP),
-                "TRACKS");
-    }
-}
-
-static void show_mode(void)
-{
-    ui_ink(mode == MODE_QUICK ? UI_LGREEN : UI_YELLOW);
-    ui_text_pad(232, (unsigned char)(FIELD_Y + 1 * FIELD_STEP),
-                mode == MODE_QUICK ? "QUICK" : "SURFACE", 8);
 }
 
 static void msg(const char *s, unsigned char colour)
 {
     ui_ink(colour);
     ui_text_pad(8, MSG_Y, s, 38);
+}
+
+/* The whole disc goes over to one colour, which is how the state of the
+ * disk is shown once the tracks are down: yellow while it is being
+ * checked, green when it came back good, red when it did not. Colour only,
+ * so it costs one store a cell and redraws nothing.
+ */
+static void disc_colour(unsigned char colour)
+{
+    ui_cell_colour(24, 3, 16, 13, colour);
+}
+
+/* QUICK mode has nothing to count. The drive runs its own format as one
+ * job and reports nothing until it is finished: a 1541 goes deaf for the
+ * duration, and a 1581, which does answer the bus, holds its cylinder
+ * counter at 79 from the moment the job starts, so there is no cylinder to
+ * read. Measured, not assumed: tests/t_poll.c polls $0088 four thousand
+ * times during an N: and gets one value.
+ *
+ * So the bar does not pretend. It sweeps to say work is happening, the
+ * track counter shows dashes rather than a number nobody knows, and the
+ * disc fills as the shape of the pass. Only SURFACE mode, which issues one
+ * job per track, has a real figure to draw, and there it draws one.
+ */
+static void show_sweep(unsigned char phase)
+{
+    ui_cell_blank(2, BAR_Y / 8, 36, 1);
+    ui_ink(UI_CYAN);
+    ui_bar(16u + ((unsigned int)(phase & 31u) * 8u), BAR_Y, 32);
+}
+
+static void show_track_unknown(unsigned char total)
+{
+    ui_ink(UI_GREY);
+    ui_text(152, STAT_Y, "--");
+    ui_ink(UI_WHITE);
+    ui_num(176, STAT_Y, total, 2);
+    ui_ink(UI_DGREY);
+    ui_num(232, STAT_Y, bad_count, 2);
+    ui_num(304, STAT_Y, 0, 1);
 }
 
 static void show_bar(unsigned char done, unsigned char total)
@@ -372,31 +503,46 @@ static void show_ring(unsigned char track, unsigned char total,
     rx = ((unsigned int)ry * 6u) / 5u;
     ui_ink(colour);
     ui_ring(DISC_CX, DISC_CY, ry);
+    draw_slot();
 
-    /* The head marker sits just outside the ring being written. */
-    ui_arrow(DISC_CX + rx + 6, (unsigned char)(DISC_CY - 10));
+    /* The head rides the window, on the ring it is writing: straight down
+     * from the middle of the disc, the ring at radius ry crosses the
+     * window at DISC_CY + ry, so that is simply where the carriage goes.
+     * It walks up the window towards the hub as the pass goes on.
+     */
+    {
+        unsigned char hy = (unsigned char)(DISC_CY + ry);
+
+        if (hy > SLOT_Y2) {
+            hy = SLOT_Y2;
+        } else if (hy < SLOT_Y1) {
+            hy = SLOT_Y1;
+        }
+        ui_arrow(SLOT_X + SLOT_W / 2 - 12, (unsigned char)(hy - 10));
+    }
+    (void)rx;
 }
 
 static void show_track(unsigned char track, unsigned char total,
                        unsigned char retry)
 {
     ui_ink(UI_WHITE);
-    ui_num(56, STAT_Y, track, 2);
-    ui_num(80, STAT_Y, total, 2);
+    ui_num(152, STAT_Y, track, 2);
+    ui_num(176, STAT_Y, total, 2);
     ui_ink(bad_count ? UI_LRED : UI_DGREY);
-    ui_num(152, STAT_Y, bad_count, 2);
+    ui_num(232, STAT_Y, bad_count, 2);
     ui_ink(retry ? UI_LRED : UI_DGREY);
-    ui_num(240, STAT_Y, retry, 1);
+    ui_num(304, STAT_Y, retry, 1);
 }
 
 static void show_track_labels(void)
 {
     ui_ink(UI_GREY);
-    ui_text(8, STAT_Y, "TRACK");
-    ui_text(72, STAT_Y, "/");
+    ui_text(104, STAT_Y, "TRACK");
+    ui_text(168, STAT_Y, "/");
     ui_ink(UI_DGREY);
-    ui_text(112, STAT_Y, "BAD");
-    ui_text(184, STAT_Y, "RETRY");
+    ui_text(200, STAT_Y, "BAD");
+    ui_text(256, STAT_Y, "RETRY");
 }
 
 /* ---------------------------------------------------------------------- */
@@ -407,15 +553,21 @@ static void probe(void)
 {
     msg("LOOKING FOR THE DRIVE", UI_GREY);
     show_seg_device();
-    if (!dos_open(dev)) {
+    if (!dos_present(dev)) {
+        dos_close();
         dos_drive_type = DRV_UNKNOWN;
+        dos_tracks     = 0;
+    } else if (!dos_open(dev)) {
+        dos_drive_type = DRV_UNKNOWN;
+        dos_tracks     = 0;
     } else {
         dos_identify();
     }
+    ui_head_shape((unsigned char)(dos_drive_type != DRV_1581));
     show_device();
     show_dos();
     show_name();
-    show_mode();
+    draw_keys();
     show_wait();
     if (dos_drive_type == DRV_UNKNOWN) {
         msg("NO DRIVE THERE, OR ONE I CANNOT DRIVE", UI_LRED);
@@ -427,6 +579,45 @@ static void probe(void)
 /* Type over the disk name in place. Letters and digits only, stored as the
  * unshifted PETSCII the DOS expects.
  */
+/* Two characters, which is all a disk ID is. Letters and digits only,
+ * unshifted, for the same reason the disk name is: a shifted PETSCII code
+ * lands on the disk as a graphics character.
+ */
+static void edit_id(void)
+{
+    unsigned char n = 0;
+    unsigned char c;
+
+    msg("TYPE TWO CHARACTERS FOR THE ID", UI_YELLOW);
+    for (;;) {
+        c = cbm_k_getin();
+        if (c == 0) {
+            continue;
+        }
+        if (c == 13) {
+            break;
+        }
+        if (c == 20 && n > 0) {         /* delete */
+            --n;
+        } else if (n < 2 &&
+                   ((c >= 0x41 && c <= 0x5a) || (c >= 0xc1 && c <= 0xda) ||
+                    (c >= 0x30 && c <= 0x39))) {
+            if (c >= 0xc1) {
+                c = (unsigned char)(c - 0x80);
+            }
+            if (n == 0) {
+                id1 = c;
+            } else {
+                id2 = c;
+            }
+            ++n;
+        }
+        show_name();
+    }
+    show_name();
+    msg("READY", UI_LGREEN);
+}
+
 static void edit_name(void)
 {
     unsigned char n = (unsigned char)strlen(disk_name);
@@ -496,7 +687,7 @@ static void run_quick(void)
     bad_count = 0;
     last_ring = 0;
 
-    msg("FORMATTING, THE BAR IS AN ESTIMATE", UI_CYAN);
+    msg("FORMATTING. THE DRIVE REPORTS NOTHING UNTIL DONE", UI_CYAN);
     fmt_native_start(disk_name, id1, id2);
 
     /* One step of the bar per track's worth of time. The drive is not
@@ -505,9 +696,10 @@ static void run_quick(void)
     for (t = 1; t <= total; ++t) {
         led((unsigned char)(t & 1));    /* the drive is working throughout */
         dos_delay_long(step);
+        snd_click();
         show_ring(t, total, UI_CYAN);
-        show_bar(t, total);
-        show_track(t, total, 0);
+        show_sweep(t);
+        show_track_unknown(total);
     }
 
     show_ring(total, total, UI_CYAN);
@@ -516,9 +708,11 @@ static void run_quick(void)
     ui_arrow_off();
 
     msg("CHECKING", UI_CYAN);
+    disc_colour(UI_YELLOW);
     led(1);
     st = fmt_native_end();
     led(0);
+    disc_colour(st ? UI_LRED : UI_LGREEN);
     if (st != 0) {
         msg("THE DRIVE REPORTED A PROBLEM", UI_LRED);
         ui_ink(UI_LRED);
@@ -569,6 +763,7 @@ static void run_format(void)
             }
             show_ring(t, total, UI_CYAN);
         }
+        snd_click();
         show_bar(t, total);
         show_track(t, total, retry);
 
@@ -583,9 +778,11 @@ static void run_format(void)
     ui_arrow_off();
 
     msg("WRITING THE DIRECTORY", UI_CYAN);
+    disc_colour(UI_YELLOW);
     led(1);
     st = fmt_filesystem(disk_name, id1, id2);
     led(0);
+    disc_colour(st ? UI_LRED : (bad_count ? UI_YELLOW : UI_LGREEN));
     if (st != 0) {
         msg("THE DIRECTORY DID NOT TAKE", UI_LRED);
         return;
@@ -607,6 +804,7 @@ int main(void)
     unsigned char c;
 
     ui_init();
+    snd_init();
     draw_static();
     show_track_labels();
     probe();
@@ -620,7 +818,7 @@ int main(void)
     if (dos_drive_type != DRV_UNKNOWN) {
 #ifdef AUTORUN_SURFACE
         mode = MODE_SURFACE;
-        show_mode();
+        draw_keys();
         run_format();
 #else
         run_quick();
@@ -651,13 +849,22 @@ int main(void)
                 msg("LOWER IS QUICKER, TOO LOW HANGS THE MACHINE",
                     UI_YELLOW);
                 break;
+            case 138: /* F4: the drive noise */
+                snd_enable((unsigned char)(snd_enabled() ? 0 : 1));
+                draw_keys();
+                msg(snd_enabled() ? "DRIVE NOISE ON" : "DRIVE NOISE OFF",
+                    UI_GREY);
+                break;
             case 135: /* F5 */
                 edit_name();
                 break;
-            case 140: /* F8: which kind of format */
+            case 139: /* F6 */
+                edit_id();
+                break;
+            case 137: /* F2: which kind of format */
                 mode = (unsigned char)(mode == MODE_QUICK ? MODE_SURFACE
                                                           : MODE_QUICK);
-                show_mode();
+                draw_keys();
                 msg(mode == MODE_QUICK
                     ? "QUICK: THE DRIVE DOES IT, NO BAD TRACK CHECK"
                     : "SURFACE: TRACK BY TRACK, SLOW, FINDS BAD ONES",
@@ -676,6 +883,12 @@ int main(void)
                     msg("LEFT ALONE", UI_GREY);
                 }
                 break;
+            case 140: /* F8: back to BASIC, screen as we found it */
+                snd_hush();
+                snd_enable(0);
+                dos_close();
+                ui_done();
+                return 0;
             default:
                 break;
         }

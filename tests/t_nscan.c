@@ -1,6 +1,6 @@
 /* t_nscan.c - look for a drive variable that tracks progress during the
  * 1581's own N: command. Dumps the same block twice, well apart.
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  */
 #include <stdio.h>
 #include <conio.h>

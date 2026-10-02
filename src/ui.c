@@ -9,7 +9,7 @@
  * The primitives that get called in bulk are in src/gfx.s; what is left
  * here is the arithmetic that decides where things go.
  *
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  *
  * Required libraries: cc65 C library.
  */
@@ -28,6 +28,9 @@
 #define VIC_BACK  (*(volatile unsigned char *)0xd021)
 #define VIC_SPREN (*(volatile unsigned char *)0xd015)
 #define VIC_SPCOL (*(volatile unsigned char *)0xd027)
+#define VIC_SPMC  (*(volatile unsigned char *)0xd01c)
+#define VIC_SPXE  (*(volatile unsigned char *)0xd01d)
+#define VIC_SPYE  (*(volatile unsigned char *)0xd017)
 #define VIC_SPX   ((volatile unsigned char *)0xd000)
 #define VIC_SPMSB (*(volatile unsigned char *)0xd010)
 #define CIA2_PRA  (*(volatile unsigned char *)0xdd00)
@@ -36,7 +39,7 @@
 
 /* Parameters for the assembly primitives. */
 extern unsigned int  gfx_x, gfx_x2;
-extern unsigned char gfx_y, gfx_col, gfx_ch;
+extern unsigned char gfx_y, gfx_col, gfx_ch, gfx_inv;
 extern void gfx_clear(void);
 extern void gfx_plot(void);
 extern void gfx_hline(void);
@@ -70,24 +73,55 @@ static unsigned char ink = UI_CYAN;
  * already spoken for by the disc's own ink, and a sprite carries its own
  * colour over the top of them.
  */
-static const unsigned char arrow[63] = {
+/* The head carriage, as two sprites: one sized for a 5.25 inch head and
+ * one for a 3.5 inch one. It rides the window in the disc where the media
+ * is exposed, which is where a head actually is, so the shape is a square
+ * carriage with the head itself solid in the middle rather than a pointer
+ * from outside. A C64 sprite is 24 by 21, so neither is the real ratio;
+ * what carries is that the 5.25 inch one is visibly the bigger.
+ */
+static const unsigned char head_525[63] = {
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
-    0x01, 0x00, 0x00,
-    0x03, 0x00, 0x00,
-    0x07, 0x00, 0x00,
-    0x0f, 0xff, 0xf0,
     0x1f, 0xff, 0xf0,
-    0x3f, 0xff, 0xf0,
-    0x7f, 0xff, 0xf0,
-    0x3f, 0xff, 0xf0,
+    0x10, 0x00, 0x10,
+    0x10, 0x00, 0x10,
+    0x10, 0x00, 0x10,
+    0x10, 0x00, 0x10,
+    0x10, 0x38, 0x10,
+    0x10, 0x38, 0x10,
+    0x10, 0x38, 0x10,
+    0x10, 0x00, 0x10,
+    0x10, 0x00, 0x10,
+    0x10, 0x00, 0x10,
+    0x10, 0x00, 0x10,
     0x1f, 0xff, 0xf0,
-    0x0f, 0xff, 0xf0,
-    0x07, 0x00, 0x00,
-    0x03, 0x00, 0x00,
-    0x01, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00
+};
+
+static const unsigned char head_35[63] = {
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x03, 0xff, 0x80,
+    0x02, 0x00, 0x80,
+    0x02, 0x00, 0x80,
+    0x02, 0x38, 0x80,
+    0x02, 0x38, 0x80,
+    0x02, 0x38, 0x80,
+    0x02, 0x00, 0x80,
+    0x02, 0x00, 0x80,
+    0x03, 0xff, 0x80,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
@@ -112,7 +146,8 @@ void ui_init(void)
     build_xscale();
 
     for (n = 0; n < 63u; ++n) {
-        SPRITES[n] = arrow[n];
+        SPRITES[n]      = head_525[n];
+        SPRITES[64 + n] = head_35[n];
     }
 
     /* VIC bank 1 ($4000-$7FFF). The two low bits of port A are inverted,
@@ -132,6 +167,12 @@ void ui_init(void)
 
     SCREEN[0x3f8] = (unsigned char)((0x5000 - 0x4000) / 64); /* sprite 0 */
     VIC_SPCOL = UI_WHITE;
+    /* Single width, single height, one colour. Never assume a reset
+     * left these clear; a doubled sprite is a blob.
+     */
+    VIC_SPMC = 0x00;
+    VIC_SPXE = 0x00;
+    VIC_SPYE = 0x00;
     VIC_SPREN = 0x00;
 
     ui_clear();
@@ -299,27 +340,44 @@ void ui_ring(unsigned int cx, unsigned char cy, unsigned char r)
     int x = 0;
     int y = r;
     int d = 3 - 2 * (int)r;
-    unsigned char sx, sy;
+    unsigned char sx, sy, psx, psy;
 
     if (r > 80) {
         return;
     }
+
+    /* Midpoint circle, with every x taken through the stretch table so the
+     * ring looks round on a television rather than squashed.
+     *
+     * The stretch is what makes this more than a plot per octant. One step
+     * in y moves the stretched x by about one and a fifth pixels, so
+     * plotting points alone leaves the ring combed, worst at the forty
+     * five degree corners where both coordinates are moving. Each point is
+     * therefore joined to the one before it with a short horizontal run,
+     * which closes the gaps in all eight octants and costs nothing: a run
+     * of one pixel is a plot.
+     */
+    psx = xscale[0];
+    psy = xscale[y];
+
     while (x <= y) {
         sx = xscale[x];
         sy = xscale[y];
 
-        ui_plot(cx + sy, (unsigned char)(cy + x));
-        ui_plot(cx - sy, (unsigned char)(cy + x));
-        ui_plot(cx + sy, (unsigned char)(cy - x));
-        ui_plot(cx - sy, (unsigned char)(cy - x));
-        /* Across the top and bottom of the ring the x step is wider than
-         * one pixel once it has been stretched, so these go down as short
-         * runs rather than points; otherwise the ring comes out combed.
-         */
-        ui_hline(cx + sx, cx + sx + 1, (unsigned char)(cy + y));
-        ui_hline(cx - sx - 1, cx - sx, (unsigned char)(cy + y));
-        ui_hline(cx + sx, cx + sx + 1, (unsigned char)(cy - y));
-        ui_hline(cx - sx - 1, cx - sx, (unsigned char)(cy - y));
+        /* The steep octants, joined along the row they share. */
+        ui_hline(cx + sy, cx + psy, (unsigned char)(cy + x));
+        ui_hline(cx - psy, cx - sy, (unsigned char)(cy + x));
+        ui_hline(cx + sy, cx + psy, (unsigned char)(cy - x));
+        ui_hline(cx - psy, cx - sy, (unsigned char)(cy - x));
+
+        /* The shallow octants, where the run is the whole of the step. */
+        ui_hline(cx + psx, cx + sx, (unsigned char)(cy + y));
+        ui_hline(cx - sx, cx - psx, (unsigned char)(cy + y));
+        ui_hline(cx + psx, cx + sx, (unsigned char)(cy - y));
+        ui_hline(cx - sx, cx - psx, (unsigned char)(cy - y));
+
+        psx = sx;
+        psy = sy;
 
         if (d < 0) {
             d += 4 * x + 6;
@@ -331,9 +389,18 @@ void ui_ring(unsigned int cx, unsigned char cy, unsigned char r)
     }
 }
 
+
 /* ---------------------------------------------------------------------- */
 /* the head marker                                                         */
 /* ---------------------------------------------------------------------- */
+
+/* Which carriage to use. The two blocks sit back to back at the bottom of
+ * the VIC bank, so this is one store into the sprite pointer.
+ */
+void ui_head_shape(unsigned char big)
+{
+    SCREEN[0x3f8] = (unsigned char)(big ? 0x40 : 0x41);
+}
 
 void ui_arrow(unsigned int x, unsigned char y)
 {
@@ -385,6 +452,14 @@ static void draw_glyph(unsigned int x, unsigned char y, unsigned char g)
     gfx_y  = y;
     gfx_ch = g;
     gfx_glyph();
+}
+
+/* Reverse video: the ink fills the cell and the letter is knocked out of
+ * it in black. One EOR in the glyph blitter, so it costs nothing.
+ */
+void ui_reverse(unsigned char on)
+{
+    gfx_inv = on ? 0xffu : 0x00u;
 }
 
 void ui_text(unsigned int x, unsigned char y, const char *s)

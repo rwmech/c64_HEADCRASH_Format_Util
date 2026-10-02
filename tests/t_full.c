@@ -1,6 +1,6 @@
 /* t_full.c - harness: full track pass plus BAM/directory, end to end.
  * Build with -DT_DEV=8 (1541) or -DT_DEV=9 (1581).
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  */
 
 #include <stdio.h>

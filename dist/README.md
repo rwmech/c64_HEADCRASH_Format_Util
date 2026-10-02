@@ -17,4 +17,4 @@ The program loads at `$0801` and runs from there, moving the screen into
 VIC bank 1. It does not use the REU or any cartridge, and it talks to the
 drive through the KERNAL, so JiffyDOS and the usual accelerators are fine.
 
-(C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+(C) 2026 Robert Mech. Licence MIT.

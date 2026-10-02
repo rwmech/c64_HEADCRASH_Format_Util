@@ -25,7 +25,7 @@
  *         outright. There is no signal to wait for, so the host waits out a
  *         measured worst case instead and only then asks. See docs/DESIGN.md.
  *
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  *
  * Required libraries: cc65 C library.
  */

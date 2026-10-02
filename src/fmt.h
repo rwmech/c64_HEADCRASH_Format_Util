@@ -3,7 +3,7 @@
  * The drive's own ROM does the GCR work; this drives it one track at a
  * time so the host can show progress and retry a track that fails.
  *
- * (C) 2026 Robert Mech. Licence GPL-3.0-or-later.
+ * (C) 2026 Robert Mech. Licence MIT.
  */
 
 #ifndef FMT_H
