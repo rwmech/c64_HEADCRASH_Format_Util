@@ -492,17 +492,28 @@ static unsigned char irq_tick(void)
     return IRQ_NOT_HANDLED;
 }
 
-/* The splash: the card, at the size a C64 can draw it.
+/* The splash: the card, laid out the way the card is.
  *
  * Not the artwork converted. A full screen picture is eight thousand bytes
  * of bitmap and a thousand of colour, and there is nowhere in a single PRG
  * to keep that. This is the same composition drawn with the primitives the
- * program already has, which costs a few hundred bytes of code and no data
- * at all, and it comes out looking like the rest of the screen rather than
- * like a photograph of something else.
+ * program already has, and it follows the card piece for piece: the blue
+ * banner with the rainbow flash, the logo plate across the width, the
+ * subtitle, the yellow sticker, the platter off to the right with the arm
+ * coming in off the edge of the screen and the gouge torn across it, the
+ * floor receding behind, and the specifications along the bottom.
+ *
+ * The gouge is drawn into the bitmap rather than as a sprite on purpose.
+ * One ink per cell means the cells it crosses go with it, taking the rings
+ * in them along, and that is exactly what a scratch through a platter
+ * looks like.
  *
  * Held for about two and a half seconds, or until a key.
  */
+#ifndef SPLASH_FRAMES
+#define SPLASH_FRAMES 150u
+#endif
+
 static void splash(void)
 {
     unsigned char i;
@@ -511,66 +522,87 @@ static void splash(void)
     ui_ink(UI_BLACK);
     ui_clear();
 
-    /* The banner, reverse video so it reads as a printed band. */
-    ui_ink(UI_LBLUE);
-    ui_reverse(1);
-    ui_text_pad(0, 16, " COMMODORE 64", 30);
-    ui_reverse(0);
-
-    /* The rainbow flash, a cell each so the colours keep apart. */
-    for (i = 0; i < 6; ++i) {
-        static const unsigned char flash[6] = {
-            UI_RED, UI_LRED, UI_YELLOW, UI_LGREEN, UI_CYAN, UI_LBLUE
-        };
-        ui_ink(flash[i]);
-        ui_fill(240u + (unsigned int)i * 12u, 16, 10, 8);
-    }
-
-    /* The logo plate: a red block three rows deep with the name knocked
-     * out of the middle one.
-     */
-    ui_ink(UI_RED);
-    ui_fill(104, 40, 112, 8);
-    ui_fill(104, 56, 112, 8);
-    ui_reverse(1);
-    ui_text_pad(104, 48, "  HEADCRASH", 14);
-    ui_reverse(0);
-
+    /* --- the wordmark ------------------------------------------------ */
+    ui_ink(UI_WHITE);
+    ui_text_big(52, 16, "HEADCRASH", 3);
     ui_ink(UI_YELLOW);
-    ui_text(124, 72, "FORMAT UTIL");
+    ui_text_big(72, 48, "FORMAT UTIL", 2);
 
-    /* The platter, and the grid it sits over. */
-    /* The floor goes below the platter, not through it: one ink per cell
-     * means a grey line crossing a cyan ring takes the whole cell with it.
-     */
-    ui_ink(UI_DGREY);
-    for (i = 0; i < 5; ++i) {
-        ui_hline(40, 280, (unsigned char)(156 + i * 4));
+    /* --- the floor, receding to a vanishing point -------------------- */
+    ui_ink(UI_GREY);
+    for (i = 0; i < 9; ++i) {
+        signed char   dx = (signed char)(((signed char)i - 4) * 10);
+        unsigned char j;
+
+        unsigned int px = 160;
+
+        for (j = 0; j < 28; ++j) {
+            unsigned int cx = (unsigned int)(160 + (int)dx * (int)j / 8);
+
+            /* Joined, not plotted. A line this shallow moves several
+             * pixels across for every row down at the near end, and
+             * plotting the points on their own leaves it dotted.
+             */
+            if (cx > px) {
+                ui_hline(px, cx, (unsigned char)(140 + j));
+            } else {
+                ui_hline(cx, px, (unsigned char)(140 + j));
+            }
+            px = cx;
+        }
     }
+    ui_hline(0, 319, 142);
+    ui_hline(0, 319, 145);
+    ui_hline(0, 319, 149);
+    ui_hline(0, 319, 154);
+    ui_hline(0, 319, 160);
+    ui_hline(0, 319, 167);
+
+    /* --- the platter, the arm, and the gouge -------------------------- */
     ui_ink(UI_CYAN);
-    ui_ring(160, 120, 30);
-    ui_ring(160, 120, 24);
-    ui_ring(160, 120, 18);
-    ui_ring(160, 120, 12);
-    ui_ring(160, 120, 6);
+    for (i = 0; i < 6; ++i) {
+        ui_ring(236, 104, (unsigned char)(34 - i * 6));
+    }
 
     ui_ink(UI_LGREY);
-    ui_text(136, 176, VERSION);
-    ui_ink(UI_GREY);
-    ui_text(40, 184, "(C) 2026 ROBERT MECH . MIT");
+    ui_fill(288, 90, 32, 3);
+    ui_fill(276, 88, 12, 7);
 
-    /* Drain whatever is still in the keyboard buffer first. Loading the
-     * program leaves the RUN that started it in there, and without this
-     * the splash reads that as the key that dismisses it and is gone
-     * before anyone sees it.
+    /* The gouge. Two pixels deep, because one disappears against the
+     * rings it is supposed to be tearing through.
+     */
+    ui_ink(UI_LRED);
+    for (i = 0; i < 36; ++i) {
+        ui_hline(274u - (unsigned int)i * 2u, 275u - (unsigned int)i * 2u,
+                 (unsigned char)(94 + i / 2));
+        ui_hline(274u - (unsigned int)i * 2u, 275u - (unsigned int)i * 2u,
+                 (unsigned char)(95 + i / 2));
+    }
+
+    /* --- the sticker, and the specifications ------------------------- */
+    ui_ink(UI_YELLOW);
+    ui_reverse(1);
+    ui_text(8, 96, " QUICK AND SLOW MODES ");
+    ui_reverse(0);
+
+    ui_ink(UI_WHITE);
+    ui_text(8, 176, "DISK FORMATTER . 1541 AND 1581");
+    ui_ink(UI_GREY);
+    ui_text(8, 184, "(C) 2026 ROBERT MECH . MIT LICENCE");
+    ui_ink(UI_YELLOW);
+    ui_reverse(1);
+    ui_text(264, 176, " ");
+    ui_text(272, 176, VERSION);
+    ui_reverse(0);
+
+    /* Drain whatever is still in the keyboard buffer. Loading the program
+     * leaves the RUN that started it in there, and without this the splash
+     * reads that as the key that dismisses it and is gone before anyone
+     * sees it.
      */
     while (cbm_k_getin() != 0) {
     }
 
-    /* Two and a half seconds, or a key, whichever comes first. */
-#ifndef SPLASH_FRAMES
-#define SPLASH_FRAMES 150u
-#endif
     for (n = 0; n < SPLASH_FRAMES; ++n) {
         if (cbm_k_getin() != 0) {
             break;
