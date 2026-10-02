@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  headcrash_card.svg - label artwork for a TeensyROM NFC card.
+
+  CR80 badge stock: 85.6 x 54 mm trim, 3.18 mm corner radius, with 2 mm
+  bleed all round, so the artboard is 89.6 x 58 mm. Everything that must
+  survive the cut sits at least 3 mm inside the trim.
+
+  Drawn to look like a Commodore 64 game box from about 1984: the blue
+  banner across the top with the rainbow flash, a heavy outlined logo with
+  a hard shadow over an illustration, a perspective grid horizon, and the
+  specifications crammed along the bottom in small caps.
+
+  (C) 2026 Robert Mech. Licence MIT.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="89.6mm" height="58mm" viewBox="0 0 89.6 58">
+
+  <defs>
+    <!-- The sky behind the illustration, blue down into black. -->
+    <linearGradient id="sky" x1="0" y1="11.5" x2="0" y2="45"
+                    gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#352879"/>
+      <stop offset="0.55" stop-color="#1b1340"/>
+      <stop offset="1"    stop-color="#000000"/>
+    </linearGradient>
+
+    <!-- The glow sitting on the horizon. -->
+    <radialGradient id="glow" cx="0.5" cy="1" r="0.75">
+      <stop offset="0"   stop-color="#ff7a2e" stop-opacity="0.95"/>
+      <stop offset="0.4" stop-color="#9a3b86" stop-opacity="0.5"/>
+      <stop offset="1"   stop-color="#352879" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- The platter surface. -->
+    <linearGradient id="disc" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#8f8f96"/>
+      <stop offset="0.5" stop-color="#4a4a52"/>
+      <stop offset="1"   stop-color="#2a2a30"/>
+    </linearGradient>
+
+    <clipPath id="trim">
+      <rect x="2" y="2" width="85.6" height="54" rx="3.18" ry="3.18"/>
+    </clipPath>
+    <clipPath id="artzone">
+      <rect x="0" y="11.5" width="89.6" height="33.5"/>
+    </clipPath>
+    <clipPath id="platter">
+      <ellipse cx="65" cy="31" rx="14.5" ry="9"/>
+    </clipPath>
+  </defs>
+
+  <!-- Bleed. Anything outside the trim is there to be cut off. -->
+  <rect width="89.6" height="58" fill="#000000"/>
+
+  <g clip-path="url(#trim)">
+
+    <!-- ============ illustration ============ -->
+    <rect x="0" y="11.5" width="89.6" height="33.5" fill="url(#sky)"/>
+
+    <g clip-path="url(#artzone)">
+      <!-- horizon glow -->
+      <ellipse cx="45" cy="34.5" rx="46" ry="12" fill="url(#glow)"/>
+
+      <!-- perspective floor, the one thing every 1984 cover had -->
+      <g stroke="#70a4b2" stroke-width="0.18" opacity="0.75">
+        <line x1="45" y1="34.5" x2="-30" y2="45"/>
+        <line x1="45" y1="34.5" x2="-8"  y2="45"/>
+        <line x1="45" y1="34.5" x2="9"   y2="45"/>
+        <line x1="45" y1="34.5" x2="23"  y2="45"/>
+        <line x1="45" y1="34.5" x2="34"  y2="45"/>
+        <line x1="45" y1="34.5" x2="45"  y2="45"/>
+        <line x1="45" y1="34.5" x2="56"  y2="45"/>
+        <line x1="45" y1="34.5" x2="67"  y2="45"/>
+        <line x1="45" y1="34.5" x2="81"  y2="45"/>
+        <line x1="45" y1="34.5" x2="98"  y2="45"/>
+        <line x1="45" y1="34.5" x2="120" y2="45"/>
+        <line x1="0" y1="35.6" x2="89.6" y2="35.6"/>
+        <line x1="0" y1="37.0" x2="89.6" y2="37.0"/>
+        <line x1="0" y1="38.8" x2="89.6" y2="38.8"/>
+        <line x1="0" y1="41.1" x2="89.6" y2="41.1"/>
+        <line x1="0" y1="44.0" x2="89.6" y2="44.0"/>
+      </g>
+      <line x1="0" y1="34.5" x2="89.6" y2="34.5"
+            stroke="#ffd08a" stroke-width="0.35" opacity="0.9"/>
+
+      <!-- the platter, and the head going into it -->
+      <ellipse cx="65" cy="31" rx="14.5" ry="9" fill="url(#disc)"
+               stroke="#c8c8d0" stroke-width="0.3"/>
+      <g clip-path="url(#platter)" fill="none" stroke="#a0a0aa"
+         stroke-width="0.14" opacity="0.65">
+        <ellipse cx="65" cy="31" rx="12.6" ry="7.8"/>
+        <ellipse cx="65" cy="31" rx="10.7" ry="6.6"/>
+        <ellipse cx="65" cy="31" rx="8.8"  ry="5.4"/>
+        <ellipse cx="65" cy="31" rx="6.9"  ry="4.3"/>
+        <ellipse cx="65" cy="31" rx="5.0"  ry="3.1"/>
+      </g>
+      <ellipse cx="65" cy="31" rx="3.0" ry="1.9"
+               fill="#1a1a20" stroke="#c8c8d0" stroke-width="0.25"/>
+      <ellipse cx="65" cy="31" rx="1.1" ry="0.7" fill="#000000"/>
+
+      <!-- the gouge: this is the head crash the thing is named after -->
+      <g clip-path="url(#platter)">
+        <path d="M 78 26.5 L 72.5 28.2 L 69.5 27.1 L 65.5 29.4
+                 L 62 28.0 L 57 30.6 L 53 29.2"
+              fill="none" stroke="#ff7a2e" stroke-width="0.9"
+              stroke-linejoin="round"/>
+        <path d="M 78 26.5 L 72.5 28.2 L 69.5 27.1 L 65.5 29.4
+                 L 62 28.0 L 57 30.6 L 53 29.2"
+              fill="none" stroke="#ffe79a" stroke-width="0.3"
+              stroke-linejoin="round"/>
+      </g>
+
+      <!-- the actuator arm, coming in off the edge of the card -->
+      <path d="M 92 20.5 L 92 25.5 L 76 28.3 L 74.6 27.0 Z"
+            fill="#8e8e98" stroke="#d8d8e0" stroke-width="0.25"/>
+      <path d="M 76.6 26.1 L 80.2 25.5 L 80.2 28.1 L 76.6 28.7 Z"
+            fill="#e8e8f0" stroke="#ffffff" stroke-width="0.2"/>
+
+      <!-- sparks off the impact -->
+      <g fill="#ffd04a">
+        <path d="M 77.2 25.3 L 79.4 22.6 L 78.2 25.6 L 80.6 24.6
+                 L 78.4 26.3 Z"/>
+        <path d="M 75.4 29.4 L 74.2 32.4 L 76.0 30.3 L 76.2 32.6
+                 L 76.9 29.9 Z"/>
+      </g>
+      <circle cx="81.0" cy="23.3" r="0.35" fill="#fff3c4"/>
+      <circle cx="73.4" cy="33.2" r="0.3"  fill="#fff3c4"/>
+      <circle cx="83.2" cy="27.6" r="0.25" fill="#ffd04a"/>
+    </g>
+
+    <!-- ============ top banner ============ -->
+    <rect x="0" y="0" width="89.6" height="11.5" fill="#352879"/>
+    <rect x="0" y="11.2" width="89.6" height="0.55" fill="#ffffff"/>
+
+    <text x="5" y="8.7" font-family="DejaVu Sans Condensed, DejaVu Sans, sans-serif"
+          font-weight="bold" font-size="5.1" fill="#ffffff"
+          letter-spacing="0.42">COMMODORE 64</text>
+
+    <!-- the rainbow flash, skewed the way Commodore drew it -->
+    <g transform="skewX(-16)">
+      <rect x="76.0" y="4.2" width="2.1" height="5.6" fill="#a3271e"/>
+      <rect x="78.4" y="4.2" width="2.1" height="5.6" fill="#d96b1e"/>
+      <rect x="80.8" y="4.2" width="2.1" height="5.6" fill="#e8be1e"/>
+      <rect x="83.2" y="4.2" width="2.1" height="5.6" fill="#4e9e4e"/>
+      <rect x="85.6" y="4.2" width="2.1" height="5.6" fill="#2d6ba8"/>
+      <rect x="88.0" y="4.2" width="2.1" height="5.6" fill="#7a4e9e"/>
+    </g>
+
+    <!-- ============ logo ============ -->
+    <!-- Hard shadow, heavy keyline, then the fill: three passes, because
+         that is how these were printed and it is what keeps the word
+         readable sitting on top of an illustration. -->
+    <g font-family="DejaVu Sans Condensed, DejaVu Sans, sans-serif"
+       font-weight="bold" font-size="12.4" letter-spacing="-0.18">
+      <text x="5.6" y="24.4" fill="#000000" opacity="0.85">HEADCRASH</text>
+      <text x="5"   y="23.8" stroke="#000000" stroke-width="1.5"
+            fill="#000000">HEADCRASH</text>
+      <text x="5"   y="23.8" stroke="#9a2a1e" stroke-width="0.7"
+            fill="#ffffff">HEADCRASH</text>
+    </g>
+
+    <!-- subtitle bar -->
+    <rect x="5" y="25.6" width="43.4" height="5.6" fill="#a3271e"
+          stroke="#000000" stroke-width="0.3"/>
+    <text x="7" y="29.7" font-family="DejaVu Sans Condensed, DejaVu Sans, sans-serif"
+          font-weight="bold" font-size="4.0" fill="#e8be1e"
+          letter-spacing="0.5">FORMAT UTIL</text>
+
+    <!-- corner flash -->
+    <g transform="rotate(-9 26 37.5)">
+      <rect x="5" y="34.3" width="42" height="5.0" fill="#e8be1e"
+            stroke="#000000" stroke-width="0.3"/>
+      <text x="6.6" y="38.0"
+            font-family="DejaVu Sans Condensed, DejaVu Sans, sans-serif"
+            font-weight="bold" font-size="3.3" fill="#000000"
+            letter-spacing="0.18">QUICK AND SLOW MODES</text>
+    </g>
+
+    <!-- ============ bottom specification band ============ -->
+    <rect x="0" y="45" width="89.6" height="13" fill="#000000"/>
+    <rect x="0" y="45" width="89.6" height="0.55" fill="#ffffff"/>
+
+    <text x="5" y="49.2" font-family="DejaVu Sans Condensed, DejaVu Sans, sans-serif"
+          font-weight="bold" font-size="3.0" fill="#ffffff"
+          letter-spacing="0.2">DISK FORMATTER . 1541 AND 1581</text>
+
+    <text x="5" y="52.3" font-family="DejaVu Sans Condensed, DejaVu Sans, sans-serif"
+          font-size="2.4" fill="#70a4b2" letter-spacing="0.1">PER TRACK
+      PROGRESS . BAD TRACK LOCKOUT</text>
+
+    <text x="5" y="55.0" font-family="DejaVu Sans Condensed, DejaVu Sans, sans-serif"
+          font-size="2.2" fill="#6c6c6c" letter-spacing="0.08">(C) 2026
+      ROBERT MECH . LICENCE MIT</text>
+
+    <!-- version badge -->
+    <rect x="72.4" y="47.0" width="12.2" height="7.2" rx="0.9"
+          fill="#e8be1e" stroke="#ffffff" stroke-width="0.35"/>
+    <text x="78.5" y="52.3" text-anchor="middle"
+          font-family="DejaVu Sans Condensed, DejaVu Sans, sans-serif"
+          font-weight="bold" font-size="4.6" fill="#000000">V1.2</text>
+
+    <!-- ============ card edge ============ -->
+    <rect x="2.3" y="2.3" width="85" height="53.4" rx="2.9" ry="2.9"
+          fill="none" stroke="#ffffff" stroke-width="0.45" opacity="0.75"/>
+  </g>
+</svg>
