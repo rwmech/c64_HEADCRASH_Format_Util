@@ -17,7 +17,7 @@ TARGET  := c64
 # mapped in, so drawing never banks anything out, and leaves the program
 # and its stack everything below $5000.
 CFLAGS  := -t $(TARGET) -O -I src \
-           -Wl -D__HIMEM__=0x5000 -Wl -D__STACKSIZE__=0x400
+           -Wl -D__HIMEM__=0x5b00 -Wl -D__STACKSIZE__=0x400
 
 BUILD   := build
 SRC     := src/main.c src/ui.c src/dos.c src/fmt.c src/snd.c

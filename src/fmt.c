@@ -50,7 +50,21 @@
  * drive and that hangs the machine rather than failing. Adjustable from
  * the interface, because the drive it runs on is the only authority.
  */
-#define A41_TRACK_WAIT 240u
+/* How long a 1541 track is allowed, in frames.
+ *
+ * There is still nothing to poll. tests/t_busy.c starts a track and then
+ * asks the drive 3000 times, across the whole write, whether it is there:
+ * it said no five times. The addressing sequence that tells an empty
+ * device number from a real one cannot tell a busy drive from an idle one,
+ * so that avenue is closed along with the other three.
+ *
+ * Which leaves the clock, and the clock has to be generous, because too
+ * high only costs time and too low hangs the machine with no way back.
+ * VICE writes a track in about 156 frames; real hardware has exceeded four
+ * seconds around track 25, where the drive changes speed zone. Six is the
+ * default now, and F3 takes it from one second to fifteen.
+ */
+#define A41_TRACK_WAIT 360u
 
 unsigned int fmt_track_wait = A41_TRACK_WAIT;
 
@@ -143,6 +157,21 @@ unsigned char fmt_begin(unsigned char id1, unsigned char id2)
     }
 
     return 0; /* nothing we know how to drive at this level */
+}
+
+/* The first half of fmt_track for a 1541: set the gate up and start the
+ * job, without waiting for it. Diagnostics use this to ask what the drive
+ * looks like from the bus while it is actually writing a track.
+ */
+void fmt_track_start(unsigned char track)
+{
+    if (dos_drive_type != DRV_1541) {
+        return;
+    }
+    dos_poke(DC1541_ENDTRK, (unsigned char)(track + 1));
+    dos_poke(A41_RETRY, 1);
+    dos_poke(A41_FTNUM, track);
+    dos_job_start(A41_SLOT, JOB_EXEC, track, 0);
 }
 
 unsigned char fmt_track(unsigned char track)

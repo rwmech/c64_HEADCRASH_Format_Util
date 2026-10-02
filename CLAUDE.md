@@ -72,6 +72,13 @@ Each of these is written up at length in `docs/DESIGN.md`. The short form:
   a busy flag on CLK from inside the drive (wedges the drive, because the
   serial port shares VIA 1 port B with the drive's own bus code). What is
   left is to wait out a measured worst case.
+- **A busy 1541 cannot be told from an idle one, either.** The addressing
+  sequence that tells an empty device number from a real one looked like
+  the way out: a drive whose processor is writing a track should not be
+  able to give the per device answer that comes after ATN is released.
+  It gives it anyway. `tests/t_busy.c` starts a track and asks 3000 times
+  across the write: five say busy. That is approach four, and it fails like
+  the other three. The clock stays.
 - **A watchdog NMI can escape a hung KERNAL call**, and `src/watchdog.s`
   does work in isolation, but unwinding out of a cc65 call tree mid KERNAL
   leaves state that still breaks. Kept in the tree, not in the build. If
@@ -123,16 +130,29 @@ Each of these is written up at length in `docs/DESIGN.md`. The short form:
 ## Screen
 
 VIC bank 1, with everything the VIC reads packed against the top of the
-bank: sprites at `$5000`, character set at `$5400`, screen matrix at
-`$5C00`, bitmap at `$6000`. All plain RAM with the ROMs mapped in, so
-drawing never banks anything out, and the program gets everything below
-`$5000` (`-Wl -D__HIMEM__=0x5000`). Set that wrong and the C stack lands on
+bank: sprites at `$5B00`, screen matrix at `$5C00`, bitmap at `$6000`, and the
+character set copy outside the bank at `$C000`. All plain RAM with the
+ROMs mapped in, so drawing never banks anything out, and the program gets
+everything below `$5B00` (`-Wl -D__HIMEM__=0x5b00`). Set that wrong and the C stack lands on
 the screen data and the machine resets, which is what the first version
 did.
 
 One ink per 8x8 cell. The layout keeps colours in their own cells, which is
 why the panels, the disc and the bar do not touch. Anything that needs a
 colour over the top of something else is a sprite.
+
+That rule applies inside a shape as well as between them. The disc is one
+ink from edge to hub, because the hub used to be grey against cyan rings
+and the first ring through a hub cell turned half the hub cyan. Two inks in
+one shape is the same mistake as two inks in one cell, just harder to see
+coming.
+
+What the VIC has to read out of bank 1 is the bitmap, the matrix and the
+sprites, and nothing else. The character set copy is not one of them: the
+VIC is in bitmap mode and never looks at it, it is only the source this
+program blits glyphs from. It sits at `$C000`, outside the bank, and the
+sprites sit at `$5B00` directly under the matrix, so the program gets
+everything below `$5B00`.
 
 A C64 pixel is about five sixths as wide as it is tall, so the disc is
 drawn as an ellipse with the horizontal radius a fifth larger than the
@@ -238,6 +258,9 @@ Next:
   straight through the left of the disc and wiped eight pixel rows of it.
   Two rounds of work went into the ring before anyone counted the lit
   pixels per row and found six rows blank from edge to edge. Count first.
+- Putting anything in VIC bank 1 that the VIC does not read. The character
+  set copy sat in the middle of it for no reason and cost the program two
+  kilobytes, which is what made it run into its own stack.
 - A held noise voice for the spindle motor. It is a drone, not a drive. The
   stepper tick on its own is the sound; everything else is noise.
 - Trusting $0088 on a 1581 as a progress counter during its own N:. It is

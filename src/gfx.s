@@ -23,7 +23,7 @@
 
 BITMAP  = $6000
 SCREEN  = $5c00
-CHARSET = $5400
+CHARSET = $c000        ; glyph source only, not read by the VIC
 
 ; cc65 has already filled its own zero page, so these use the four bytes
 ; at $fb that nothing in the KERNAL or BASIC holds across a call. Drawing

@@ -72,8 +72,12 @@ void ui_bar(unsigned int x, unsigned char y, unsigned int w);
  */
 void ui_head_shape(unsigned char big);
 
-void ui_arrow(unsigned int x, unsigned char y);
-void ui_arrow_off(void);
+/* Sprite 0 is the head, 1 and 2 are the top and bottom of the track
+ * window. x and y are the top left of the shape on screen.
+ */
+void ui_sprite(unsigned char n, unsigned int x, unsigned char y);
+void ui_sprite_off(unsigned char n);
+
 
 /* Text, positioned by pixel so it can sit next to line art. Strings are
  * plain C literals; the glyphs come from the uppercase/graphics set.

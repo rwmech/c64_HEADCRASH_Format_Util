@@ -18,8 +18,21 @@
 #include "ui.h"
 
 #define SCREEN  ((unsigned char *)0x5c00)
-#define CHARSET ((unsigned char *)0x5400)
-#define SPRITES ((unsigned char *)0x5000)
+#define CHARSET ((unsigned char *)0xc000)
+/* What the VIC actually has to read out of bank 1 is the bitmap, the
+ * screen matrix and the sprites, and nothing else. The copy of the
+ * character set is not one of them: the VIC is in bitmap mode and never
+ * looks at it, it is only the source table this program blits glyphs from,
+ * so it has no business taking two kilobytes out of the bank. It lives at
+ * $C000 now, which is RAM the VIC cannot see from here and nothing else
+ * wants.
+ *
+ * That leaves the sprites as the lowest thing the VIC reads, and they are
+ * 256 bytes, so they go directly under the matrix at $5B00. The program
+ * gets everything below that: nearly eleven kilobytes more than it had
+ * when the character set was sitting in the middle of the bank.
+ */
+#define SPRITES ((unsigned char *)0x5b00)
 
 #define VIC_CR1   (*(volatile unsigned char *)0xd011)
 #define VIC_CR2   (*(volatile unsigned char *)0xd016)
@@ -27,7 +40,7 @@
 #define VIC_BORD  (*(volatile unsigned char *)0xd020)
 #define VIC_BACK  (*(volatile unsigned char *)0xd021)
 #define VIC_SPREN (*(volatile unsigned char *)0xd015)
-#define VIC_SPCOL (*(volatile unsigned char *)0xd027)
+#define VIC_SPCOL ((volatile unsigned char *)0xd027)
 #define VIC_SPMC  (*(volatile unsigned char *)0xd01c)
 #define VIC_SPXE  (*(volatile unsigned char *)0xd01d)
 #define VIC_SPYE  (*(volatile unsigned char *)0xd017)
@@ -73,31 +86,37 @@ static unsigned char ink = UI_CYAN;
  * already spoken for by the disc's own ink, and a sprite carries its own
  * colour over the top of them.
  */
-/* The head carriage, as two sprites: one sized for a 5.25 inch head and
- * one for a 3.5 inch one. It rides the window in the disc where the media
- * is exposed, which is where a head actually is, so the shape is a square
- * carriage with the head itself solid in the middle rather than a pointer
- * from outside. A C64 sprite is 24 by 21, so neither is the real ratio;
- * what carries is that the 5.25 inch one is visibly the bigger.
+/* Four sprite shapes.
+ *
+ * The track window is two of them, stacked, because the window is 28
+ * pixels tall and a sprite is 21. They are solid and black, so what they
+ * do on top of the disc is cut a hole in it: the rings stop at the edge of
+ * the window exactly as a jacket cuts a floppy. Drawing it this way means
+ * the window costs nothing per track, where the bitmap version had to be
+ * redrawn over every ring.
+ *
+ * The head is a slider on the end of an arm, which is what the thing on a
+ * hard drive looks like, and it passes over the window. Two sizes: the
+ * 5.25 inch one is visibly the bigger.
  */
 static const unsigned char head_525[63] = {
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
-    0x1f, 0xff, 0xf0,
-    0x10, 0x00, 0x10,
-    0x10, 0x00, 0x10,
-    0x10, 0x00, 0x10,
-    0x10, 0x00, 0x10,
-    0x10, 0x38, 0x10,
-    0x10, 0x38, 0x10,
-    0x10, 0x38, 0x10,
-    0x10, 0x00, 0x10,
-    0x10, 0x00, 0x10,
-    0x10, 0x00, 0x10,
-    0x10, 0x00, 0x10,
-    0x1f, 0xff, 0xf0,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x1f, 0xf8, 0x00,
+    0x1f, 0xff, 0xff,
+    0x1f, 0xff, 0xff,
+    0x1f, 0xff, 0xff,
+    0x1f, 0xf8, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
@@ -111,15 +130,63 @@ static const unsigned char head_35[63] = {
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
-    0x03, 0xff, 0x80,
-    0x02, 0x00, 0x80,
-    0x02, 0x00, 0x80,
-    0x02, 0x38, 0x80,
-    0x02, 0x38, 0x80,
-    0x02, 0x38, 0x80,
-    0x02, 0x00, 0x80,
-    0x02, 0x00, 0x80,
-    0x03, 0xff, 0x80,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x0f, 0xf0, 0x00,
+    0x0f, 0xff, 0xff,
+    0x0f, 0xf0, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00
+};
+
+static const unsigned char win_top[63] = {
+    0x00, 0xff, 0x00,
+    0x03, 0xff, 0xc0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0
+};
+
+static const unsigned char win_bot[63] = {
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x07, 0xff, 0xe0,
+    0x03, 0xff, 0xc0,
+    0x00, 0xff, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
@@ -146,8 +213,10 @@ void ui_init(void)
     build_xscale();
 
     for (n = 0; n < 63u; ++n) {
-        SPRITES[n]      = head_525[n];
-        SPRITES[64 + n] = head_35[n];
+        SPRITES[n]       = head_525[n];
+        SPRITES[64 + n]  = head_35[n];
+        SPRITES[128 + n] = win_top[n];
+        SPRITES[192 + n] = win_bot[n];
     }
 
     /* VIC bank 1 ($4000-$7FFF). The two low bits of port A are inverted,
@@ -165,8 +234,13 @@ void ui_init(void)
     VIC_BORD = UI_BLACK;
     VIC_BACK = UI_BLACK;
 
-    SCREEN[0x3f8] = (unsigned char)((0x5000 - 0x4000) / 64); /* sprite 0 */
-    VIC_SPCOL = UI_WHITE;
+    /* Sprite 0 is the head, 1 and 2 are the two halves of the window. */
+    SCREEN[0x3f8] = 0x6c;
+    SCREEN[0x3f9] = 0x6e;
+    SCREEN[0x3fa] = 0x6f;
+    VIC_SPCOL[0] = UI_LGREY;
+    VIC_SPCOL[1] = UI_BLACK;
+    VIC_SPCOL[2] = UI_BLACK;
     /* Single width, single height, one colour. Never assume a reset
      * left these clear; a doubled sprite is a blob.
      */
@@ -399,7 +473,30 @@ void ui_ring(unsigned int cx, unsigned char cy, unsigned char r)
  */
 void ui_head_shape(unsigned char big)
 {
-    SCREEN[0x3f8] = (unsigned char)(big ? 0x40 : 0x41);
+    SCREEN[0x3f8] = (unsigned char)(big ? 0x6c : 0x6d);
+}
+
+/* Position a sprite and switch it on. x and y are the top left of the 24
+ * by 21 shape in screen coordinates; the VIC's own offsets are added here.
+ */
+void ui_sprite(unsigned char n, unsigned int x, unsigned char y)
+{
+    unsigned int  sx  = x + 24;
+    unsigned char bit = (unsigned char)(1u << n);
+
+    VIC_SPX[n * 2]     = (unsigned char)(sx & 0xff);
+    VIC_SPX[n * 2 + 1] = (unsigned char)(y + 50);
+    if (sx > 255) {
+        VIC_SPMSB |= bit;
+    } else {
+        VIC_SPMSB = (unsigned char)(VIC_SPMSB & ~bit);
+    }
+    VIC_SPREN |= bit;
+}
+
+void ui_sprite_off(unsigned char n)
+{
+    VIC_SPREN = (unsigned char)(VIC_SPREN & ~(1u << n));
 }
 
 void ui_arrow(unsigned int x, unsigned char y)

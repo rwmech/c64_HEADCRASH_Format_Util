@@ -56,8 +56,8 @@ The keys are along the bottom of the screen, two rows of four:
 ```
 F1 DRIVE   cycle the device number, 8 to 11
 F2 QUICK   switch between QUICK and SLOW formatting, and says which
-F3 WAIT    how long a 1541 track is allowed, SLOW mode only, and
-           shows the figure on the button itself
+F3 WAIT    how long a 1541 track is allowed, SLOW mode only, one to
+           fifteen seconds, shown on the button itself
 F4 SOUND   the stepper tick on or off, during a format as well as
            before one
 F5 NAME    name the disk
@@ -148,7 +148,13 @@ the whole disc goes green, or red if it did not come back clean.
 
 The drive noise is one SID voice: a 24 ms noise burst on every track step
 and nothing else. A held rumble for the spindle was tried and was simply a
-drone. F4 silences it, during a format as well as before one.
+drone. There are also two tunes on three voices, both Beethoven and both
+out of copyright by about a century and a half: the opening of the Fifth
+when a format starts and the first phrase of the Ode to Joy when it
+finishes, which is the one that matters when the machine is across the
+room. They are advanced a row at a time from the interrupt, so nothing ever
+waits on a note. The master volume is half of full on purpose. F4 silences
+all of it, during a format as well as before one.
 
 The bottom two rows are the keys, as reverse video buttons. F2 and F3 and
 F4 carry their own state, so the mode, the 1541 wait and the sound have no
