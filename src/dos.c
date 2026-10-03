@@ -48,13 +48,40 @@ static unsigned char buf_is_open  = 0;
 /* Wait n video frames by watching the raster counter, which keeps working
  * with interrupts off and needs no CIA state of its own. Roughly 17 ms per
  * frame on NTSC, 20 ms on PAL; nothing here needs better than that.
+ *
+ * The line being watched for is 250, and the choice is the whole point.
+ *
+ * $D012 holds the low eight bits of the raster line and the ninth bit lives
+ * in $D011, which nothing here reads. A frame has more than 256 lines on
+ * every machine this runs on - 263 on NTSC, 312 on PAL - so any line number
+ * below the count minus 256 appears twice in a frame as far as $D012 is
+ * concerned. This loop used to watch for zero, which is line 0 and line
+ * 256, so it counted two transitions a frame and every wait in the program
+ * was half of what it said it was: the 1541 track wait read six seconds on
+ * the button and was three, against a track that takes a little over two
+ * and longer at a speed zone edge. When a track overran, the next thing out
+ * of the program was a command to a drive that was still writing, which
+ * hangs the machine outright. That was the hang at tracks 17, 25 and 30.
+ *
+ * 250 appears once. The second pass would be line 506, which does not exist
+ * on either standard, so there is no need to read $D011 and no pair of
+ * reads to tear between. tests/t_delay.c times this against the jiffy
+ * clock, which the KERNAL advances once a frame and which knows nothing
+ * about any of this.
+ *
+ * A missed window costs a whole frame rather than half of one, because an
+ * interrupt that lands on line 250 takes longer than the 63 or 65 cycles
+ * the line lasts. That only ever makes a wait longer, which is the safe
+ * direction: too long costs time, too short hangs.
  */
+#define RASTER_MARK 250u
+
 void dos_delay(unsigned char frames)
 {
     while (frames--) {
-        while (*(volatile unsigned char *)0xd012 != 0) {
+        while (*(volatile unsigned char *)0xd012 != RASTER_MARK) {
         }
-        while (*(volatile unsigned char *)0xd012 == 0) {
+        while (*(volatile unsigned char *)0xd012 == RASTER_MARK) {
         }
     }
 }
@@ -62,9 +89,9 @@ void dos_delay(unsigned char frames)
 void dos_delay_long(unsigned int frames)
 {
     while (frames--) {
-        while (*(volatile unsigned char *)0xd012 != 0) {
+        while (*(volatile unsigned char *)0xd012 != RASTER_MARK) {
         }
-        while (*(volatile unsigned char *)0xd012 == 0) {
+        while (*(volatile unsigned char *)0xd012 == RASTER_MARK) {
         }
     }
 }

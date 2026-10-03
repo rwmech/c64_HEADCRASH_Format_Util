@@ -16,7 +16,7 @@
 #include "dos.h"
 #include "fmt.h"
 
-#define VERSION "V1.7"
+#define VERSION "V1.8"
 
 /* How many times a track is attempted before it is called bad. Each
  * attempt is a whole job, drawn as it happens.
@@ -508,12 +508,23 @@ static unsigned char irq_tick(void)
  */
 static unsigned char irq_live;
 
+/* The player is stopped as well as the handler, because a tune only ends
+ * inside snd_tick and snd_tick only runs from the handler. Taking the
+ * vector off part way through a tune leaves the voices gated on whatever
+ * chord they were holding and leaves the player's own "a tune is playing"
+ * flag set, which drones for the length of the format and suppresses the
+ * stepper click for the rest of the run, since the click will not take a
+ * voice a tune is using. wait_for_tune is generous enough that this should
+ * not come up, but the handler has no business being removed from under
+ * something that is still running.
+ */
 static void irq_pause(void)
 {
     if (irq_live) {
         reset_irq();
         irq_live = 0;
     }
+    snd_hush();
 }
 
 static void irq_resume(void)

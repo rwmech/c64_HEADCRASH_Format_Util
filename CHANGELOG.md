@@ -2,6 +2,61 @@
 
 (C) 2026 Robert Mech. Licence MIT.
 
+## v1.8
+
+### Fixed
+
+- **Every wait in the program was half what it said it was.** The delay loop
+  watched the raster register at `$D012` for a low byte of zero, and `$D012`
+  holds only the low eight bits of the line. A frame has more than 256 lines
+  on both standards, 263 on NTSC and 312 on PAL, so zero comes round twice:
+  once at line 0 and again at line 256. The loop counted half frames.
+
+  The line watched for is 250 now. The second pass would be line 506, which
+  exists on neither standard, so it comes round exactly once and there is no
+  ninth bit to read out of `$D011` and no pair of reads to tear between.
+
+  With that one value changed, every figure in the program means what it
+  says: the 1541 track wait is six seconds rather than three, the job wait a
+  second and a half, the spacing between job polls half a second with twenty
+  seconds of patience behind it, the 1581 directory settle ten seconds. The
+  figure on the F3 button and the figure the drive actually gets are the
+  same figure again.
+
+  Measured both ways with `tests/t_delay.c` against the jiffy clock. Before:
+  asked 60, waited 30. After: asked 60, waited 60 on NTSC, and 727 jiffies
+  for 600 frames on PAL, which is 50.12 Hz counted by a 60 Hz clock and
+  therefore right.
+
+- **The hang on a real 1541 part way through a track at a time pass**, at
+  track 17, 25 or 30 depending on the run, follows directly from the above.
+  A real 1541 track takes a little over two seconds and longer at a speed
+  zone edge, where the formatter's gap convergence loop runs extra
+  revolutions with the drive deaf throughout. Against a wait that was three
+  seconds rather than six, a track that ran long meant the wait expired
+  while the drive was still writing, and the first thing out of the program
+  after the wait is a command to the job queue. A 1541 in the middle of a
+  write cannot hear it, and the KERNAL's byte sender has no timeout, so the
+  machine stops dead.
+
+- **A start tune could be cut off part way through**, which is why a format
+  with the music on behaved differently from one with it off.
+  `wait_for_tune` allows 200 iterations of a two frame wait, which was 200
+  frames rather than 400, and the 1812 runs 242. One start tune in three was
+  cut, and because a tune only ends inside the player's own tick and the
+  tick only runs from the interrupt, removing the interrupt mid tune left
+  the voices gated on whatever chord they were holding and left the player's
+  "a tune is playing" flag set, which also suppresses the stepper click for
+  the rest of the run. The wait now covers 400 frames, and the pause stops
+  the player as well as the handler so that it cannot come up at all.
+
+### Checked, and not the cause
+
+- Memory. BSS ends at `$5693` with the C stack starting at `$5700`, so the
+  two do not meet, and the interrupt handler's own stack at `$C900` is used
+  to a small fraction of its 128 bytes. The linker configuration added in
+  v1.5 would have failed the build rather than wrapped if it were otherwise.
+
 ## v1.7
 
 ### Measured

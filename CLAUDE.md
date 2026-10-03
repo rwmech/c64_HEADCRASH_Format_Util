@@ -88,6 +88,22 @@ Each of these is written up at length in `docs/DESIGN.md`. The short form:
   It gives it anyway. `tests/t_busy.c` starts a track and asks 3000 times
   across the write: five say busy. That is approach four, and it fails like
   the other three. The clock stays.
+- **`$D012` passes through any given low byte twice a frame, and the clock
+  this whole program runs on did not know that.** `$D012` is the low eight
+  bits of the raster line and the ninth lives in `$D011`. A frame is 263
+  lines on NTSC and 312 on PAL, so a low byte below the count minus 256
+  comes round at line n and again at line n+256. `dos_delay_long` counted
+  transitions into zero, which is line 0 and line 256, so every wait in the
+  program was half of what it said it was for every version up to v1.7: the
+  1541 track wait read six seconds on the button and gave the drive three.
+  That is the hang at tracks 17, 25 and 30, and it is also why raising the
+  wait from four to six appeared to make things worse rather than better,
+  because the numbers never meant what they said. Watch for line 250: the
+  second pass would be 506, which exists on neither standard, so it comes
+  round once, `$D011` never has to be read and there is no pair of reads to
+  tear between. `tests/t_delay.c` times the loop against the jiffy clock and
+  is the only thing that settles this. Any new constant in frames is wrong
+  until it has been through that harness.
 - **A watchdog NMI can escape a hung KERNAL call**, and `src/watchdog.s`
   does work in isolation, but unwinding out of a cc65 call tree mid KERNAL
   leaves state that still breaks. Kept in the tree, not in the build. If
@@ -327,6 +343,11 @@ Next:
 
 ## Things not to try again
 
+- Tuning a timing constant before checking what the unit actually is. Four
+  rounds went into the 1541 track hang on the assumption that the wait was
+  the number on the button, and three of them shipped. The loop was counting
+  half frames. Measure the clock first; the constant is the last thing to
+  touch, not the first.
 - Polling a 1541 during a format without a working escape. It hangs the
   machine, every time, however the poll is dressed up.
 - Raising a busy flag on a serial line from inside drive code. It wedges
